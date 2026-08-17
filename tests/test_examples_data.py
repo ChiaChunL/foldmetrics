@@ -19,13 +19,13 @@ pytestmark = pytest.mark.skipif(not DATA.exists(), reason="examples/data not pre
 def test_detects_all_bundled_tools():
     units = discover(DATA)
     assert sorted(u.tool for u in units) == [
-        "alphafold2", "alphafold3", "alphafold3", "boltz",
+        "alphafold2", "alphafold3", "alphafold3", "boltz", "chai",
     ]
 
 
 def test_scores_real_outputs():
     df = evaluate(DATA)
-    assert len(df) == 4
+    assert len(df) == 5
     assert df["has_pae"].all()
     assert df["warnings"].fillna("").eq("").all()
 

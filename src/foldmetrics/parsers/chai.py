@@ -40,9 +40,10 @@ class ChaiParser(ToolParser):
             if structure is None:
                 continue
             files = {"scores": directory / fn, "structure": directory / structure}
-            pae_file = f"pae.model_idx_{idx}.npz"
-            if pae_file in names:
-                files["pae"] = directory / pae_file
+            for pae_file in (f"pae.model_idx_{idx}.npz", f"pae_model_idx_{idx}.npz"):
+                if pae_file in names:
+                    files["pae"] = directory / pae_file
+                    break
             units.append(
                 Unit(
                     tool=self.tool,
@@ -80,10 +81,13 @@ class ChaiParser(ToolParser):
             )
             pae = np.squeeze(np.asarray(npz["pae"], dtype=float)) if "pae" in keys else None
 
+        plddt = None
         if pae is None and "pae" in unit.files:
             with np.load(unit.files["pae"]) as npz:
                 key = "pae" if "pae" in npz.files else npz.files[0]
                 pae = np.squeeze(np.asarray(npz[key], dtype=float))
+                if "plddt" in npz.files:
+                    plddt = np.squeeze(np.asarray(npz["plddt"], dtype=float))
         if pae is not None and pae.ndim == 3:
             pae = pae[0]
         if pae is None:
@@ -91,6 +95,19 @@ class ChaiParser(ToolParser):
                 "no PAE found in Chai output (rerun with PAE export enabled); "
                 "PAE-based metrics unavailable"
             )
+
+        if plddt is not None:
+            if 0.0 < float(np.nanmax(plddt)) <= 1.05:
+                plddt = plddt * 100.0
+            if plddt.shape == (len(tokens),):
+                for token, value in zip(tokens, plddt, strict=True):
+                    token.plddt = float(value)
+                    token.cb_plddt = float(value)
+            else:
+                warnings.append(
+                    f"plddt in pae npz has shape {plddt.shape} for {len(tokens)} "
+                    "tokens; using structure B-factors instead"
+                )
 
         chains: list[str] = []
         for t in tokens:

@@ -174,10 +174,22 @@ def contacts_pymol_commands(
         lines.append(f"select hotspots, {' or '.join(hot_parts)}")
         lines.append(f"set_color fm_hotspot, {_hex_rgb(HOTSPOT_COLOR)}")
         lines.append("color fm_hotspot, hotspots and elem C")
-        if labels:
-            lines.append('label hotspots and name CA, one_letter[resn]+resi')
-            lines.append("set label_size, 15")
-            lines.append("set label_color, gray30")
+    if labels and selections:
+        # open-source PyMOL builds lack `one_letter` in the label namespace;
+        # inject our own via `stored`, which label expressions can always see
+        one_letter = (
+            "{'ALA':'A','ARG':'R','ASN':'N','ASP':'D','CYS':'C','GLN':'Q',"
+            "'GLU':'E','GLY':'G','HIS':'H','ILE':'I','LEU':'L','LYS':'K',"
+            "'MET':'M','PHE':'F','PRO':'P','SER':'S','THR':'T','TRP':'W',"
+            "'TYR':'Y','VAL':'V'}"
+        )
+        lines.append(f"/from pymol import stored; stored.fm_one = {one_letter}")
+        lines.append(
+            f"label ({' or '.join(selections)}) and name CA and polymer, "
+            "stored.fm_one.get(resn, resn)+resi"
+        )
+        lines.append("set label_size, 13")
+        lines.append("set label_color, gray40")
 
     for k, (ca, ra, aa, cb, rb, ab) in enumerate(pairs or []):
         lines.append(

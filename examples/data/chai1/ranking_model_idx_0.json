@@ -1,0 +1,54 @@
+{
+ "aggregate_score": [
+  0.9438556432723999
+ ],
+ "ptm_scores": {
+  "complex_ptm": [
+   0.9711816906929016
+  ],
+  "interface_ptm": [
+   0.9370241165161133
+  ],
+  "per_chain_ptm": [
+   [
+    0.9560244679450989,
+    0.9580792188644409
+   ]
+  ],
+  "per_chain_pair_iptm": [
+   [
+    [
+     0.9560244679450989,
+     0.8959258198738098
+    ],
+    [
+     0.9370241165161133,
+     0.9580792188644409
+    ]
+   ]
+  ]
+ },
+ "clash_scores": {
+  "total_clashes": [
+   0.0
+  ],
+  "total_inter_chain_clashes": [
+   0.0
+  ],
+  "chain_chain_clashes": [
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ]
+   ]
+  ],
+  "has_inter_chain_clashes": [
+   0.0
+  ]
+ }
+}

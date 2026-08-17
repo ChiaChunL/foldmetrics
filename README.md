@@ -1,4 +1,4 @@
-# foldmetrics: unified confidence metrics for structure-prediction models
+# foldmetrics: unified confidence metrics & interface contacts for structure-prediction models
 
 <img src="https://raw.githubusercontent.com/ChiaChunL/foldmetrics/main/docs/assets/foldmetrics_banner.png" alt="foldmetrics" width="100%">
 
@@ -223,7 +223,7 @@ expose. Read them together (that is rather the point of this package).
 | AlphaFold2 (JSON layout) | `iptm_ptm.json` + `confidence_*.json` / `pae_*.json` + `unrelaxed_*.cif/.pdb` | yes | yes | yes |
 | AlphaFold3 (server/local) | `*model*.cif` + `*summary_confidences*.json` + `*confidences*/full_data*.json` | yes | yes | yes |
 | Boltz-1/2 | `confidence_*_model_*.json` + `*_model_*.cif` + `pae_*.npz` / `plddt_*.npz` | yes | yes | yes |
-| Chai-1 | `scores.model_idx_*.npz` + `pred.model_idx_*.cif` | yes | yes | if exported |
+| Chai-1 | `scores.model_idx_*.npz` + `pred.model_idx_*.cif` + `pae_model_idx_*.npz` | yes | yes | yes |
 | Protenix | `*summary_confidence*.json` + matching `.cif` (+ `*full_data*.json` with `token_pair_pae`) | yes | yes | yes |
 
 Native per-tool extras (e.g. Boltz `complex_iplddt`/`ligand_iptm`, AF3
@@ -237,13 +237,13 @@ interface table.
   Lab) verified digit-for-digit on real AlphaFold3 server output: ipSAE
   (both directions and d0chn variant), pDockQ, pDockQ2 and LIS all match to
   6 decimal places at the default cutoffs (10/10).
-- Batch-tested on 720 real predictions across AlphaFold2-Multimer,
-  AlphaFold3 (server + local), Boltz-2 and Protenix — including
+- Batch-tested on 720+ real predictions across AlphaFold2-Multimer,
+  AlphaFold3 (server + local), Boltz-2, Chai-1 and Protenix — including
   protein–small-molecule complexes, homodimers, monomers and negative
   controls — with zero parse errors; known binders score ipSAE 0.9+, decoy
   pairs < 0.1, monomers report NA.
-- ColabFold and Chai-1 parsers are currently validated on synthetic
-  fixtures only; real-output samples welcome (please open an issue).
+- The ColabFold parser is currently validated on synthetic fixtures only;
+  real-output samples welcome (please open an issue).
 
 ## 📋 What each metric needs
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "foldmetrics"
-description = "Unified confidence metrics (pTM, ipTM, pLDDT, ipLDDT, PAE, ipSAE, pDockQ, pDockQ2, LIS) for AlphaFold2/3, ColabFold, Boltz, Chai-1 and Protenix predictions"
+description = "Unified confidence metrics (pTM, ipTM, pLDDT, ipLDDT, PAE, ipSAE, pDockQ, pDockQ2, LIS, DockQ) and interface contacts for AlphaFold2/3, ColabFold, Boltz, Chai-1 and Protenix predictions"
 readme = "README.md"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
