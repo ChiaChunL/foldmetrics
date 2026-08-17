@@ -1,0 +1,31 @@
+name: Backfill GitHub Release
+
+# One-click release creation for tags that predate the automatic
+# release step in publish.yml:
+# Actions -> "Backfill GitHub Release" -> Run workflow -> enter the tag.
+# Builds the packages from that tag and attaches them to a new Release.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to create the release for (e.g. v0.1.1)"
+        required: true
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: astral-sh/setup-uv@v5
+      - name: Build sdist and wheel from the tag
+        run: uv build
+      - name: Create GitHub Release on the tag
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          files: dist/*
+          generate_release_notes: true
