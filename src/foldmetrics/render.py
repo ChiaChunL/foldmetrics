@@ -130,7 +130,7 @@ def contacts_pymol_commands(
     """
     lines = [
         "bg_color white",
-        f"load {structure_path}, model",
+        f"load {structure_path}, fm_model",
         "hide everything",
         "show cartoon",
         "set cartoon_fancy_helices, 1",
@@ -160,9 +160,9 @@ def contacts_pymol_commands(
         name = f"if_{chain}"
         lines.append(f"set_color fm_accent_{chain}, {_hex_rgb(chain_colors[chain])}")
         lines.append(f"select {name}, chain {chain} and resi {_resi_ranges(res_ids)}")
-        lines.append(f"show sticks, {name} and (sidechain or hetatm)")
-        lines.append(f"color fm_accent_{chain}, {name} and (sidechain or hetatm)")
-        lines.append(f"util.cnc {name} and (sidechain or hetatm)")
+        lines.append(f"show sticks, {name}")
+        lines.append(f"color fm_accent_{chain}, {name}")
+        lines.append(f"util.cnc {name}")
         selections.append(name)
 
     hot_parts = [
@@ -173,7 +173,7 @@ def contacts_pymol_commands(
     if hot_parts:
         lines.append(f"select hotspots, {' or '.join(hot_parts)}")
         lines.append(f"set_color fm_hotspot, {_hex_rgb(HOTSPOT_COLOR)}")
-        lines.append("color fm_hotspot, hotspots and (sidechain or hetatm) and elem C")
+        lines.append("color fm_hotspot, hotspots and elem C")
         if labels:
             lines.append('label hotspots and name CA, one_letter[resn]+resi')
             lines.append("set label_size, 15")
@@ -182,8 +182,8 @@ def contacts_pymol_commands(
     for k, (ca, ra, aa, cb, rb, ab) in enumerate(pairs or []):
         lines.append(
             f"distance fm_contact_{k}, "
-            f"model and chain {ca} and resi {ra} and name {aa}, "
-            f"model and chain {cb} and resi {rb} and name {ab}"
+            f"fm_model and chain {ca} and resi {ra} and name {aa}, "
+            f"fm_model and chain {cb} and resi {rb} and name {ab}"
         )
         lines.append(f"hide labels, fm_contact_{k}")
 

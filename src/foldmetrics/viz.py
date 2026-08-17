@@ -421,10 +421,13 @@ def _contact_structure_panel(
     highlight: dict[str, list[int]],
     hotspots: dict[str, list[int]],
     pairs: list[tuple] | None = None,
+    structure_image: str | Path | None = None,
 ) -> None:
     color_of = {c: chain_color(i) for i, c in enumerate(pred.chains)}
     image = None
-    if renderer in ("auto", "pymol"):
+    if structure_image is not None and Path(structure_image).exists():
+        image = plt.imread(str(structure_image))
+    if image is None and renderer in ("auto", "pymol"):
         from foldmetrics.render import render_contacts
 
         tmp = Path(tempfile.mkstemp(suffix=".png")[1])
@@ -464,8 +467,13 @@ def plot_contact_map(
     dist_cutoff: float = 8.0,
     pae_cutoff: float | None = 12.0,
     renderer: str = "auto",
+    structure_image: str | Path | None = None,
 ) -> plt.Figure:
-    """Confident-contact figure: highlighted structure + PAE with contact overlay."""
+    """Confident-contact figure: highlighted structure + PAE with contact overlay.
+
+    ``structure_image`` swaps in a pre-rendered structure picture (e.g. a
+    ChimeraX still saved from the generated session) for the left panel.
+    """
     highlight = contact_highlight(contacts)
     hotspots = contact_hotspots(contacts)
     pairs = contact_pair_atoms(contacts)
@@ -494,7 +502,8 @@ def plot_contact_map(
         structure_slot = gs[0, 0]
 
     _contact_structure_panel(
-        pred, fig, structure_slot, renderer, highlight, hotspots, pairs
+        pred, fig, structure_slot, renderer, highlight, hotspots, pairs,
+        structure_image=structure_image,
     )
     ax_text.axis("off")
     ax_text.text(
@@ -514,8 +523,12 @@ def save_contact_plot(
     pae_cutoff: float | None = 12.0,
     renderer: str = "auto",
     dpi: int = 300,
+    structure_image: str | Path | None = None,
 ) -> Path:
-    fig = plot_contact_map(pred, contacts, dist_cutoff, pae_cutoff, renderer)
+    fig = plot_contact_map(
+        pred, contacts, dist_cutoff, pae_cutoff, renderer,
+        structure_image=structure_image,
+    )
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=dpi, bbox_inches="tight", facecolor="white")
