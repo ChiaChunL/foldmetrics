@@ -1,0 +1,76 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "foldmetrics"
+description = "Unified confidence metrics (pTM, ipTM, pLDDT, ipLDDT, PAE, ipSAE, pDockQ, pDockQ2, LIS) for AlphaFold2/3, ColabFold, Boltz, Chai-1 and Protenix predictions"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Jiajun Li", email = "ChiaChun.Le@gmail.com" }]
+keywords = [
+    "alphafold",
+    "structure-prediction",
+    "protein-complex",
+    "plddt",
+    "pae",
+    "ipsae",
+    "pdockq",
+    "iptm",
+    "boltz",
+    "chai-1",
+    "protenix",
+    "bioinformatics",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "numpy>=1.23",
+    "pandas>=2.0",
+    "gemmi>=0.6.4",
+    "matplotlib>=3.7",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+foldmetrics = "foldmetrics.cli:main"
+fmx = "foldmetrics.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ChiaChunL/foldmetrics"
+Repository = "https://github.com/ChiaChunL/foldmetrics"
+Issues = "https://github.com/ChiaChunL/foldmetrics/issues"
+
+[tool.hatch.version]
+path = "src/foldmetrics/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/foldmetrics"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
