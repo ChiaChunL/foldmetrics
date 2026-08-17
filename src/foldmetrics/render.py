@@ -118,24 +118,40 @@ def contacts_pymol_commands(
     highlight: dict[str, list[int]],
     hotspots: dict[str, list[int]],
     chain_colors: dict[str, str],
+    pairs: list[tuple] | None = None,
     labels: bool = True,
 ) -> list[str]:
-    """Publication-preset PyMOL commands highlighting interface contacts."""
+    """Publication-preset PyMOL commands highlighting interface contacts.
+
+    Flat, outlined look (``ray_trace_mode 1``); cartoon colors are pinned
+    per chain so residue highlighting never bleeds onto the cartoon;
+    ``pairs`` draws dashed contact lines between specific atoms
+    ((chain_a, res_a, atom_a, chain_b, res_b, atom_b) tuples).
+    """
     lines = [
         "bg_color white",
         f"load {structure_path}, model",
         "hide everything",
         "show cartoon",
         "set cartoon_fancy_helices, 1",
+        "set cartoon_side_chain_helper, 1",
         "set ray_shadows, 0",
-        "set specular, 0.15",
-        "set stick_radius, 0.2",
+        "set specular, 0",
+        "set ambient, 0.45",
+        "set ray_trace_mode, 1",
+        "set ray_trace_color, gray30",
+        "set stick_radius, 0.22",
+        "set dash_color, gray50",
+        "set dash_gap, 0.45",
+        "set dash_width, 2.0",
         "show sticks, hetatm and not solvent",
         "util.cnc hetatm and not solvent",
     ]
     for i, chain in enumerate(chains):
         lines.append(f"set_color fm_pastel_{chain}, {_hex_rgb(pastel_color(i))}")
         lines.append(f"color fm_pastel_{chain}, chain {chain}")
+        # pin the cartoon color: residue recoloring must not bleed onto it
+        lines.append(f"set cartoon_color, fm_pastel_{chain}, chain {chain}")
 
     selections = []
     for chain, res_ids in highlight.items():
@@ -145,8 +161,8 @@ def contacts_pymol_commands(
         lines.append(f"set_color fm_accent_{chain}, {_hex_rgb(chain_colors[chain])}")
         lines.append(f"select {name}, chain {chain} and resi {_resi_ranges(res_ids)}")
         lines.append(f"show sticks, {name} and (sidechain or hetatm)")
-        lines.append(f"color fm_accent_{chain}, {name}")
-        lines.append(f"util.cnc {name}")
+        lines.append(f"color fm_accent_{chain}, {name} and (sidechain or hetatm)")
+        lines.append(f"util.cnc {name} and (sidechain or hetatm)")
         selections.append(name)
 
     hot_parts = [
@@ -157,11 +173,19 @@ def contacts_pymol_commands(
     if hot_parts:
         lines.append(f"select hotspots, {' or '.join(hot_parts)}")
         lines.append(f"set_color fm_hotspot, {_hex_rgb(HOTSPOT_COLOR)}")
-        lines.append("color fm_hotspot, hotspots and elem C")
+        lines.append("color fm_hotspot, hotspots and (sidechain or hetatm) and elem C")
         if labels:
             lines.append('label hotspots and name CA, one_letter[resn]+resi')
-            lines.append("set label_size, 16")
+            lines.append("set label_size, 15")
             lines.append("set label_color, gray30")
+
+    for k, (ca, ra, aa, cb, rb, ab) in enumerate(pairs or []):
+        lines.append(
+            f"distance fm_contact_{k}, "
+            f"model and chain {ca} and resi {ra} and name {aa}, "
+            f"model and chain {cb} and resi {rb} and name {ab}"
+        )
+        lines.append(f"hide labels, fm_contact_{k}")
 
     if selections:
         lines.append(f"select interface, {' or '.join(selections)}")
@@ -182,6 +206,7 @@ def write_contacts_pml(
     highlight: dict[str, list[int]],
     hotspots: dict[str, list[int]],
     chain_colors: dict[str, str],
+    pairs: list[tuple] | None = None,
     header: str = "",
 ) -> Path:
     """Write an interactive PyMOL script (double-click / ``@script.pml``)."""
@@ -189,7 +214,7 @@ def write_contacts_pml(
     pml_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [f"# {header}"] if header else []
     lines += contacts_pymol_commands(
-        Path(structure_path).resolve(), chains, highlight, hotspots, chain_colors
+        Path(structure_path).resolve(), chains, highlight, hotspots, chain_colors, pairs
     )
     pml_path.write_text("\n".join(lines) + "\n")
     return pml_path
@@ -226,6 +251,7 @@ def save_contacts_pse(
     highlight: dict[str, list[int]],
     hotspots: dict[str, list[int]],
     chain_colors: dict[str, str],
+    pairs: list[tuple] | None = None,
     timeout: int = 300,
 ) -> Path | None:
     """PyMOL session with the contact preset applied; None if no PyMOL."""
@@ -234,7 +260,7 @@ def save_contacts_pse(
         return None
     pse_path = Path(pse_path)
     commands = contacts_pymol_commands(
-        structure_path.resolve(), chains, highlight, hotspots, chain_colors
+        structure_path.resolve(), chains, highlight, hotspots, chain_colors, pairs
     )
     script = "from pymol import cmd, util\n" + "\n".join(
         f"cmd.do({line!r})" for line in commands
@@ -250,6 +276,7 @@ def render_contacts(
     highlight: dict[str, list[int]],
     hotspots: dict[str, list[int]],
     chain_colors: dict[str, str],
+    pairs: list[tuple] | None = None,
     width: int = 1400,
     height: int = 1150,
     dpi: int = 300,
@@ -261,7 +288,7 @@ def render_contacts(
         return None
     out_png = Path(out_png)
     commands = contacts_pymol_commands(
-        structure_path.resolve(), chains, highlight, hotspots, chain_colors
+        structure_path.resolve(), chains, highlight, hotspots, chain_colors, pairs
     )
     script = "from pymol import cmd, util\n" + "\n".join(
         f"cmd.do({line!r})" for line in commands
@@ -277,8 +304,13 @@ def contacts_cxc_commands(
     highlight: dict[str, list[int]],
     hotspots: dict[str, list[int]],
     chain_colors: dict[str, str],
+    pairs: list[tuple] | None = None,
 ) -> list[str]:
-    """Publication-preset ChimeraX commands (silhouette style)."""
+    """Publication-preset ChimeraX commands (silhouette style).
+
+    ``pairs`` draws dashed contact lines between specific atoms
+    ((chain_a, res_a, atom_a, chain_b, res_b, atom_b) tuples).
+    """
     lines = [
         f"open {structure_path}",
         "set bgColor white",
@@ -303,6 +335,13 @@ def contacts_cxc_commands(
         lines.append(f"color {spec} {chain_colors[chain]} target a")
         lines.append(f"color {spec} byhetero")
         interface_specs.append(spec)
+
+    # dashed contact lines first, so the later residue labels survive
+    if pairs:
+        for ca, ra, aa, cb, rb, ab in pairs:
+            lines.append(f"distance /{ca}:{ra}@{aa} /{cb}:{rb}@{ab}")
+        lines.append("distance style color #666666 radius 0.05 dashes 6")
+        lines.append("label delete pseudobonds")
 
     hot_specs = [
         f"/{chain}:{_resi_ranges(res_ids, sep=',')}"
@@ -330,6 +369,7 @@ def write_contacts_cxc(
     highlight: dict[str, list[int]],
     hotspots: dict[str, list[int]],
     chain_colors: dict[str, str],
+    pairs: list[tuple] | None = None,
     header: str = "",
 ) -> Path:
     """Write an interactive ChimeraX script (open it in ChimeraX to run)."""
@@ -337,7 +377,7 @@ def write_contacts_cxc(
     cxc_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [f"# {header}"] if header else []
     lines += contacts_cxc_commands(
-        Path(structure_path).resolve(), chains, highlight, hotspots, chain_colors
+        Path(structure_path).resolve(), chains, highlight, hotspots, chain_colors, pairs
     )
     cxc_path.write_text("\n".join(lines) + "\n")
     return cxc_path
@@ -350,6 +390,7 @@ def save_contacts_cxs(
     highlight: dict[str, list[int]],
     hotspots: dict[str, list[int]],
     chain_colors: dict[str, str],
+    pairs: list[tuple] | None = None,
     timeout: int = 300,
 ) -> Path | None:
     """ChimeraX session with the contact preset applied; None if no ChimeraX."""
@@ -361,7 +402,7 @@ def save_contacts_cxs(
     cxs_path.parent.mkdir(parents=True, exist_ok=True)
 
     commands = contacts_cxc_commands(
-        structure_path.resolve(), chains, highlight, hotspots, chain_colors
+        structure_path.resolve(), chains, highlight, hotspots, chain_colors, pairs
     )
     commands += [f"save {cxs_path.resolve()} format session", "exit"]
     with tempfile.NamedTemporaryFile("w", suffix=".cxc", delete=False) as fh:

@@ -377,6 +377,7 @@ def cmd_contacts(args: argparse.Namespace) -> int:
                 chain_color,
                 contact_highlight,
                 contact_hotspots,
+                contact_pair_atoms,
                 save_contact_plot,
             )
 
@@ -392,12 +393,13 @@ def cmd_contacts(args: argparse.Namespace) -> int:
 
             highlight = contact_highlight(rows)
             hotspots = contact_hotspots(rows)
+            pairs = contact_pair_atoms(rows)
             colors = {c: chain_color(i) for i, c in enumerate(pred.chains)}
             header = (
                 f"foldmetrics contacts: {pred.name} "
                 f"(d <= {args.dist_cutoff:g} A, PAE < {pae_cutoff or 'off'})"
             )
-            preset = (pred.source, pred.chains, highlight, hotspots, colors)
+            preset = (pred.source, pred.chains, highlight, hotspots, colors, pairs)
             pml = write_contacts_pml(args.plot / f"{base}_contacts.pml", *preset,
                                      header=header)
             print(f"wrote {pml}", file=sys.stderr)

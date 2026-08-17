@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 240" width="880" height="240" role="img" aria-label="foldmetrics">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 264" width="880" height="264" role="img" aria-label="foldmetrics">
   <defs>
     <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0c2135"/>
@@ -10,17 +10,14 @@
     </linearGradient>
   </defs>
 
-  <rect x="1.5" y="1.5" width="877" height="237" rx="18" fill="url(#card)" stroke="#20503c" stroke-width="1.5"/>
+  <rect x="1.5" y="1.5" width="877" height="261" rx="18" fill="url(#card)" stroke="#20503c" stroke-width="1.5"/>
 
   <!-- icon: stylized PAE matrix with chain bars and contact dots -->
-  <g transform="translate(46,54)">
-    <!-- chain bars: top -->
+  <g transform="translate(46,68)">
     <rect x="14" y="-12" width="62" height="7" rx="3.5" fill="#4EA6DC"/>
     <rect x="80" y="-12" width="62" height="7" rx="3.5" fill="#E69F00"/>
-    <!-- chain bars: left -->
     <rect x="-12" y="14" width="7" height="62" rx="3.5" fill="#4EA6DC"/>
     <rect x="-12" y="80" width="7" height="62" rx="3.5" fill="#E69F00"/>
-    <!-- matrix cells 4x4, cell 30px, gap 3 -->
     <g>
       <rect x="14"  y="14"  width="62" height="62" rx="6" fill="url(#diag)"/>
       <rect x="80"  y="80"  width="62" height="62" rx="6" fill="url(#diag)"/>
@@ -33,38 +30,40 @@
       <rect x="14"  y="113" width="29" height="29" rx="5" fill="#d9f2e2"/>
       <rect x="47"  y="113" width="29" height="29" rx="5" fill="#c3e7d1"/>
     </g>
-    <!-- confident contact dots on the off-diagonal blocks -->
     <circle cx="94"  cy="61" r="4.5" fill="#D55E00" stroke="#ffffff" stroke-width="1.4"/>
     <circle cx="127" cy="28" r="4.5" fill="#D55E00" stroke="#ffffff" stroke-width="1.4"/>
     <circle cx="61"  cy="94" r="4.5" fill="#D55E00" stroke="#ffffff" stroke-width="1.4"/>
   </g>
 
   <!-- wordmark -->
-  <text x="218" y="103" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
-        font-size="54" font-weight="700" fill="#F4F7F5" letter-spacing="-1">fold<tspan fill="#7BD8A8">metrics</tspan></text>
+  <text x="218" y="94" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="52" font-weight="700" fill="#F4F7F5" letter-spacing="-1">fold<tspan fill="#7BD8A8">metrics</tspan></text>
 
   <!-- tagline -->
-  <text x="220" y="136" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
-        font-size="16.5" fill="#BACDC4">Unified confidence metrics for structure-prediction models</text>
-  <text x="220" y="158" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
-        font-size="13.5" fill="#7E968B">AlphaFold2/3&#160;&#160;·&#160;&#160;ColabFold&#160;&#160;·&#160;&#160;Boltz&#160;&#160;·&#160;&#160;Chai-1&#160;&#160;·&#160;&#160;Protenix</text>
+  <text x="220" y="126" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="16" fill="#BACDC4">Unified confidence metrics · contacts · publication-ready figures</text>
+  <text x="220" y="148" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="13" fill="#7E968B">AlphaFold2/3&#160;&#160;·&#160;&#160;ColabFold&#160;&#160;·&#160;&#160;Boltz&#160;&#160;·&#160;&#160;Chai-1&#160;&#160;·&#160;&#160;Protenix</text>
 
-  <!-- command pill -->
-  <rect x="219" y="174" width="428" height="36" rx="9" fill="#0a1522" stroke="#27513e"/>
-  <text x="236" y="197" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
-        font-size="15" fill="#8FE3B0">$ fmx score predictions/ <tspan fill="#6DA3D8">--plot</tspan> figures/</text>
+  <!-- command pills -->
+  <rect x="219" y="163" width="440" height="33" rx="9" fill="#0a1522" stroke="#27513e"/>
+  <text x="235" y="185" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+        font-size="14.5" fill="#8FE3B0">$ fmx score predictions/ <tspan fill="#6DA3D8">--plot</tspan> figures/</text>
+  <rect x="219" y="203" width="440" height="33" rx="9" fill="#0a1522" stroke="#27513e"/>
+  <text x="235" y="225" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+        font-size="14.5" fill="#8FE3B0">$ fmx contacts predictions/ <tspan fill="#6DA3D8">--plot</tspan> figures/</text>
 
   <!-- metric chips -->
   <g font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="600" text-anchor="middle">
-    <rect x="706" y="38"  width="128" height="30" rx="15" fill="#009E73"/>
-    <text x="770" y="58"  fill="#ffffff">ipSAE</text>
-    <rect x="706" y="76"  width="128" height="30" rx="15" fill="#D55E00"/>
-    <text x="770" y="96"  fill="#ffffff">pDockQ / 2</text>
-    <rect x="706" y="114" width="128" height="30" rx="15" fill="#E69F00"/>
-    <text x="770" y="134" fill="#ffffff">pTM · ipTM</text>
-    <rect x="706" y="152" width="128" height="30" rx="15" fill="#4EA6DC"/>
-    <text x="770" y="172" fill="#ffffff">pLDDT · PAE</text>
-    <rect x="706" y="190" width="128" height="30" rx="15" fill="#0072B2"/>
-    <text x="770" y="210" fill="#ffffff">LIS · DockQ</text>
+    <rect x="706" y="41"  width="128" height="30" rx="15" fill="#009E73"/>
+    <text x="770" y="61"  fill="#ffffff">ipSAE</text>
+    <rect x="706" y="79"  width="128" height="30" rx="15" fill="#D55E00"/>
+    <text x="770" y="99"  fill="#ffffff">pDockQ / 2</text>
+    <rect x="706" y="117" width="128" height="30" rx="15" fill="#E69F00"/>
+    <text x="770" y="137" fill="#ffffff">pTM · ipTM</text>
+    <rect x="706" y="155" width="128" height="30" rx="15" fill="#4EA6DC"/>
+    <text x="770" y="175" fill="#ffffff">pLDDT · PAE</text>
+    <rect x="706" y="193" width="128" height="30" rx="15" fill="#0072B2"/>
+    <text x="770" y="213" fill="#ffffff">LIS · DockQ</text>
   </g>
 </svg>

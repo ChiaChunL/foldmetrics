@@ -92,13 +92,19 @@ def plot_plddt(pred: Prediction, ax: plt.Axes) -> None:
     """Per-token pLDDT, one colored segment per chain, with confidence bands."""
     for low, high, color, label in PLDDT_BANDS:
         ax.axhspan(low, high, color=color, alpha=0.12, lw=0, zorder=0)
+        # legend swatch + label in the right margin, AlphaFold style
+        ax.scatter(
+            [1.013], [(low + high) / 2.0],
+            transform=ax.get_yaxis_transform(),
+            s=34, marker="s", color=color, edgecolors="none", clip_on=False,
+        )
         ax.text(
-            1.01,
+            1.028,
             (low + high) / 2.0,
             label,
             transform=ax.get_yaxis_transform(),
             fontsize=7,
-            color=MUTED,
+            color=INK,
             va="center",
         )
 
@@ -373,6 +379,14 @@ def contact_hotspots(contacts: list[dict], n_pairs: int = 3) -> dict[str, list[i
     return {chain: sorted(res) for chain, res in hotspots.items()}
 
 
+def contact_pair_atoms(contacts: list[dict], n: int = 8) -> list[tuple]:
+    """Atom pairs of the ``n`` closest contacts (for dashed contact lines)."""
+    return [
+        (r["chain_a"], r["res_a"], r["atom_a"], r["chain_b"], r["res_b"], r["atom_b"])
+        for r in sorted(contacts, key=lambda r: r["distance"])[:n]
+    ]
+
+
 def _contacts_text(pred: Prediction, contacts: list[dict],
                    dist_cutoff: float, pae_cutoff: float | None) -> str:
     pae_txt = f"PAE < {pae_cutoff:g} Å (both directions)" if pae_cutoff else "no PAE filter"
@@ -406,6 +420,7 @@ def _contact_structure_panel(
     pred: Prediction, fig: plt.Figure, slot: Any, renderer: str,
     highlight: dict[str, list[int]],
     hotspots: dict[str, list[int]],
+    pairs: list[tuple] | None = None,
 ) -> None:
     color_of = {c: chain_color(i) for i, c in enumerate(pred.chains)}
     image = None
@@ -415,7 +430,7 @@ def _contact_structure_panel(
         tmp = Path(tempfile.mkstemp(suffix=".png")[1])
         try:
             rendered = render_contacts(
-                pred.source, tmp, pred.chains, highlight, hotspots, color_of
+                pred.source, tmp, pred.chains, highlight, hotspots, color_of, pairs
             )
             if rendered is not None:
                 image = plt.imread(str(tmp))
@@ -453,6 +468,7 @@ def plot_contact_map(
     """Confident-contact figure: highlighted structure + PAE with contact overlay."""
     highlight = contact_highlight(contacts)
     hotspots = contact_hotspots(contacts)
+    pairs = contact_pair_atoms(contacts)
 
     if pred.has_pae:
         fig = plt.figure(figsize=(13.5, 5.6))
@@ -477,7 +493,9 @@ def plot_contact_map(
         ax_text = fig.add_subplot(gs[0, 1])
         structure_slot = gs[0, 0]
 
-    _contact_structure_panel(pred, fig, structure_slot, renderer, highlight, hotspots)
+    _contact_structure_panel(
+        pred, fig, structure_slot, renderer, highlight, hotspots, pairs
+    )
     ax_text.axis("off")
     ax_text.text(
         0.0, 1.0, _contacts_text(pred, contacts, dist_cutoff, pae_cutoff),

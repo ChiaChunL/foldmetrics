@@ -1,6 +1,6 @@
 # foldmetrics: unified confidence metrics for structure-prediction models
 
-<img src="https://raw.githubusercontent.com/ChiaChunL/foldmetrics/main/docs/assets/foldmetrics_banner.svg" alt="foldmetrics" width="100%">
+<img src="https://raw.githubusercontent.com/ChiaChunL/foldmetrics/main/docs/assets/foldmetrics_banner.png" alt="foldmetrics" width="100%">
 
 | Testing | [![CI](https://github.com/ChiaChunL/foldmetrics/actions/workflows/ci.yml/badge.svg)](https://github.com/ChiaChunL/foldmetrics/actions/workflows/ci.yml) |
 |---|---|
@@ -28,9 +28,9 @@ for a single model or whole batches:
 | `lis` | Local Interaction Score from PAE (Kim 2024) | computed |
 | `dockq` | true interface accuracy vs a reference structure (Basu & Wallner 2016) | computed, optional |
 
-Beyond scores it extracts **confident interface contacts** (distance + PAE
-filtered residue pairs, with PyMOL scripts) and renders
-**publication-oriented figures**.
+Beyond scores it extracts **confident interface contacts** (with
+ready-to-open PyMOL/ChimeraX sessions) and renders **publication-oriented
+figures**.
 
 ## 📦 Installation
 
@@ -55,41 +55,43 @@ pip install -e ".[dev]"
 
 CLI (`foldmetrics`, short alias `fmx`):
 
+Every command below runs as-is from a clone, against the bundled real
+examples — swap `examples/data` for your own prediction folders or files:
+
 ```bash
-# score every prediction found under a directory (any mix of tools)
-foldmetrics score path/to/predictions/ -o metrics.tsv
+# score everything (tools are auto-detected and can be mixed)
+fmx score examples/data -o metrics.tsv --interfaces interfaces.tsv --plot plots/
 
-# per chain-pair breakdown + summary figures (structure, pLDDT, PAE, metrics)
-fmx score preds/ -o metrics.tsv --interfaces interfaces.tsv --plot plots/
+# one metric only — every metric name is also a subcommand
+fmx ipsae examples/data
+fmx score examples/data --metrics ipsae,pdockq2,lis
 
-# a single model: point at any of its files
-fmx score run1/fold_job_full_data_0.json
+# confident interface contacts: table + figure + PyMOL/ChimeraX sessions
+fmx contacts examples/data/af3_server -o contacts.tsv --plot plots/
 
-# one metric only (every metric name is also a subcommand)
-fmx ipsae preds/ --interfaces ipsae_per_pair.tsv
-fmx score preds/ --metrics ipsae,pdockq2,lis
-
-# confident interface contacts (+ figure + PyMOL script)
-fmx contacts preds/ -o contacts.tsv --plot plots/
-
-# DockQ against an experimental / reference structure
-fmx dockq preds/ --ref native.pdb -o dockq.tsv
+# DockQ: the AlphaFold2 model against the AlphaFold-Server model as reference
+fmx dockq examples/data/af2_multimer --ref examples/data/af3_server/fold_barnase_barstar_s318_model_0.cif
 
 # what would be scored?
-fmx detect preds/
+fmx detect examples/data
 ```
 
 Python:
 
 ```python
-import foldmetrics as fm
+import foldmetrics as fmx
 
-df = fm.evaluate("path/to/predictions/")              # one row per model
-dfi = fm.evaluate_interfaces("path/to/predictions/")  # one row per chain pair
+df = fmx.evaluate("examples/data")  # one row per model
+print(df[["model", "tool", "iptm", "ipsae", "pdockq2"]].round(3))
+#                                model       tool   iptm  ipsae  pdockq2
+#           model_1_multimer_v3_pred_0 alphafold2  0.937  0.897    0.952
+#                    mpro_nirmatrelvir alphafold3  0.970  0.836      NaN
+#    fold_barnase_barstar_s318_model_0 alphafold3  0.930  0.890    0.944
+#              barnase_barstar_model_0      boltz  0.959  0.935    0.939
 
-preds = fm.load_predictions("path/to/predictions/")
-summary, interfaces = fm.compute_all(preds[0])
-contacts = fm.find_contacts(preds[0], dist_cutoff=8.0, pae_cutoff=12.0)
+dfi = fmx.evaluate_interfaces("examples/data")  # one row per chain pair
+pred = fmx.load_predictions("examples/data")[0]
+contacts = fmx.find_contacts(pred, dist_cutoff=8.0, pae_cutoff=12.0)
 ```
 
 More recipes live in [examples/](examples/) — real example predictions are
@@ -97,10 +99,9 @@ included there, so every command runs as-is straight after cloning.
 
 ## 🛠️ Command-line reference
 
-In every example above, `preds/` is a **placeholder for wherever your
-prediction outputs live**: a directory (scanned recursively; different
-tools can be mixed freely), one specific model file, or any number of
-paths at once.
+`paths` accepts anything: a directory (scanned recursively; different
+tools can be mixed freely), one specific model file, or several paths at
+once.
 
 | Option | Commands | Meaning |
 |---|---|---|
@@ -134,12 +135,9 @@ batch:
 | more than one model | plus `batch_overview.png` — ranked confidence dot plot + mean pLDDT bars |
 | more than one target and/or tool | plus `comparison.png` — one panel per metric, grouped by target, one color per tool |
 
-The structure panel uses **headless PyMOL** when available (auto-detected
-from `FOLDMETRICS_PYMOL`, PATH, or common conda locations; ~2–3 s per
-model) and falls back to a fast matplotlib backbone trace otherwise —
-select explicitly with `--renderer pymol|trace`. The `plot` subcommand also
-takes `--format png|pdf|svg` and `--dpi` (default 300). The pLDDT track is
-colored by the AlphaFold confidence bands (blue / cyan / yellow / orange).
+The structure panel renders via headless PyMOL when installed
+(`--renderer pymol|trace` overrides; `FOLDMETRICS_PYMOL` sets the path).
+`plot` also takes `--format png|pdf|svg` and `--dpi`.
 
 Single model (AlphaFold3, SARS-CoV-2 Mpro + nirmatrelvir):
 
@@ -155,32 +153,24 @@ Batch overview (one target, AlphaFold2 + AlphaFold3 models):
 
 ## 🤝 Confident interface contacts
 
-`fmx contacts` extracts the inter-chain residue (and ligand-atom) pairs the
-model is *confident* about, following the interface-contact idea of Zhang
-et al. 2022: a pair is kept when the contact atoms are within
-`--dist-cutoff` (default 8 Å) **and** both PAE directions are below
-`--pae-cutoff` (default 12 Å; negative disables). Ligand atoms participate,
-so binding-site contacts are reported too.
+A contact is an inter-chain residue (or ligand-atom) pair within
+**`--dist-cutoff` 8 Å** whose
+[PAE](https://doi.org/10.1038/s41586-021-03819-2) is below
+**`--pae-cutoff` 12 Å in both directions** (negative disables the PAE
+filter).
 
 ```bash
-fmx contacts preds/ -o contacts.tsv --plot plots/
+fmx contacts examples/data/af3_server -o contacts.tsv --plot plots/
 ```
 
-Outputs per model with `--plot DIR`:
+`-o` writes the contact table; `--plot DIR` adds, per model:
 
-- the contact table (residue pair, distance, both PAE directions, pLDDTs)
-- `<model>_contacts.png` — interface residues highlighted on the structure
-  and overlaid on the PAE heatmap
-- **viewer sessions with a publication preset applied** (pastel cartoons
-  per chain, interface side chains as sticks, the closest contacts in
-  orange with labels, camera on the interface): `_contacts.pse` opens
-  directly in PyMOL and `_contacts.cxs` in ChimeraX — double-click and the
-  styled scene is there, with named selections (`if_A`, `if_B`,
-  `hotspots`, `interface`) ready in the sidebar. The script forms
-  (`_contacts.pml`, `_contacts.cxc`) are always written; the binary
-  sessions are generated when PyMOL / ChimeraX are installed
-  (auto-detected; `FOLDMETRICS_PYMOL` / `FOLDMETRICS_CHIMERAX` override).
-  Skip session generation with `--no-sessions`.
+- `*_contacts.png` — the figure below
+- `*_contacts.pse` / `*_contacts.cxs` — PyMOL / ChimeraX **sessions**:
+  double-click to open the styled interface scene, with `if_A` / `if_B` /
+  `hotspots` / `interface` selections ready (`--no-sessions` skips)
+- `*_contacts.pml` / `*_contacts.cxc` — the same scene as plain scripts,
+  always written
 
 ![contact map](https://raw.githubusercontent.com/ChiaChunL/foldmetrics/main/docs/assets/demo_contacts.png)
 
@@ -326,10 +316,6 @@ nothing crashes.
   e0161879 (2016); Mirabello C, Wallner B.
   [*DockQ v2.*](https://github.com/bjornwallner/DockQ) Bioinformatics
   (2024). — DockQ
-- Zhang J, Pei J, Durham J, Bos T, Cong Q. [*Computed cancer interactome
-  explains the effects of somatic mutations in
-  cancers.*](https://doi.org/10.1002/pro.4479) Protein Sci 31, e4479
-  (2022). — confident-contact criteria
 
 ## 📄 License
 

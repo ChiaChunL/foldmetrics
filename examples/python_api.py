@@ -15,7 +15,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-import foldmetrics as fm
+import foldmetrics as fmx
 from foldmetrics.metrics import ipsae_asym
 from foldmetrics.viz import plot_pae, plot_plddt, save_batch_plot, save_summary_plot
 
@@ -25,19 +25,19 @@ def main(path: str) -> None:
     out.mkdir(exist_ok=True)
 
     # 1. Batch scoring: one row per model ------------------------------------
-    df = fm.evaluate(path)  # accepts a directory, a file, or a list of either
+    df = fmx.evaluate(path)  # accepts a directory, a file, or a list of either
     print(df[["model", "tool", "ptm", "iptm", "ipsae", "pdockq", "plddt_mean"]]
           .to_string(index=False, float_format=lambda v: f"{v:.3f}"))
     df.to_csv(out / "metrics.tsv", sep="\t", index=False)
 
     # 2. Per chain-pair breakdown -------------------------------------------
-    dfi = fm.evaluate_interfaces(path)
+    dfi = fmx.evaluate_interfaces(path)
     print(dfi[["model", "chain_a", "chain_b", "ipsae", "pdockq2", "iptm_native"]]
           .to_string(index=False, float_format=lambda v: f"{v:.3f}"))
 
     # 3. Working with a single prediction object ----------------------------
-    pred = fm.load_predictions(path)[0]
-    summary, interfaces = fm.compute_all(pred)
+    pred = fmx.load_predictions(path)[0]
+    summary, interfaces = fmx.compute_all(pred)
     print(f"\n{pred.name}: {pred.n_tokens} tokens, chains {pred.chains}")
     print(f"  ipSAE={summary['ipsae']:.3f}  pDockQ={summary['pdockq']:.3f}")
 
@@ -49,7 +49,7 @@ def main(path: str) -> None:
               f"(byres max {result.value:.3f}, n0res={result.n0res})")
 
     # 4. Confident interface contacts ---------------------------------------
-    contacts = fm.find_contacts(pred, dist_cutoff=8.0, pae_cutoff=12.0)
+    contacts = fmx.find_contacts(pred, dist_cutoff=8.0, pae_cutoff=12.0)
     print(f"  {len(contacts)} confident contacts; closest:")
     for row in sorted(contacts, key=lambda r: r["distance"])[:3]:
         print(f"    {row['chain_a']}/{row['resname_a']}{row['res_a']} - "
