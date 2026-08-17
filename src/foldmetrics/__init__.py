@@ -5,7 +5,7 @@ computes pTM, ipTM, pLDDT, ipLDDT, PAE statistics, ipSAE, pDockQ, pDockQ2 and
 LIS for single models or whole batches.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from foldmetrics.api import (
     evaluate,
