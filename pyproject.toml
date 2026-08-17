@@ -69,11 +69,15 @@ path = "src/foldmetrics/__init__.py"
 packages = ["src/foldmetrics"]
 
 [tool.hatch.build.targets.sdist]
-# ship a lean source archive
+# ship a lean source archive:
+# and ship a lean source archive: the bundled example data and README
+# figures live in the GitHub repository, not in the sdist
 exclude = [
     "dist",
     "foldmetrics_plots",
     "example_output",
+    "examples/data",
+    "docs/assets",
 ]
 
 [tool.ruff]
