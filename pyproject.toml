@@ -44,9 +44,13 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
+dockq = [
+    "DockQ>=2.0",
+]
 dev = [
     "pytest>=7.4",
     "ruff>=0.5",
+    "DockQ>=2.0",
 ]
 
 [project.scripts]

@@ -75,6 +75,127 @@ def find_pymol() -> str | None:
     return None
 
 
+def _resi_ranges(res_ids: list[int]) -> str:
+    """Compress residue ids to a PyMOL resi expression: 3+7-10+15."""
+    ids = sorted(set(res_ids))
+    parts: list[str] = []
+    start = prev = ids[0]
+    for r in ids[1:] + [None]:  # type: ignore[list-item]
+        if r is not None and r == prev + 1:
+            prev = r
+            continue
+        parts.append(str(start) if start == prev else f"{start}-{prev}")
+        if r is not None:
+            start = prev = r
+    return "+".join(parts)
+
+
+def _hex_rgb(color: str) -> list[float]:
+    color = color.lstrip("#")
+    return [round(int(color[i : i + 2], 16) / 255.0, 3) for i in (0, 2, 4)]
+
+
+def contacts_pymol_commands(
+    structure_path: str | Path,
+    highlight: dict[str, list[int]],
+    chain_colors: dict[str, str],
+) -> list[str]:
+    """PyMOL command list highlighting interface residues per chain.
+
+    Shared by the headless renderer and the exported ``.pml`` script.
+    """
+    lines = [
+        "bg_color white",
+        f"load {structure_path}, model",
+        "hide everything",
+        "show cartoon",
+        "color gray80",
+        "show sticks, hetatm and not solvent",
+        "set stick_radius, 0.18",
+        "set cartoon_transparency, 0.1",
+    ]
+    selections = []
+    for chain, res_ids in highlight.items():
+        if not res_ids:
+            continue
+        name = f"if_{chain}"
+        color_name = f"fm_{chain}"
+        lines.append(f"set_color {color_name}, {_hex_rgb(chain_colors[chain])}")
+        lines.append(f"select {name}, chain {chain} and resi {_resi_ranges(res_ids)}")
+        lines.append(f"color {color_name}, {name}")
+        lines.append(f"show sticks, {name} and (sidechain or hetatm)")
+        selections.append(name)
+    if selections:
+        lines.append(f"select interface, {' or '.join(selections)}")
+        lines.append("orient interface")
+        lines.append("zoom interface, 6")
+    else:
+        lines.append("orient")
+    lines.append("deselect")
+    lines.append("set ray_opaque_background, 1")
+    lines.append("set antialias, 2")
+    return lines
+
+
+def write_contacts_pml(
+    pml_path: str | Path,
+    structure_path: str | Path,
+    highlight: dict[str, list[int]],
+    chain_colors: dict[str, str],
+    header: str = "",
+) -> Path:
+    """Write an interactive PyMOL script with named interface selections."""
+    pml_path = Path(pml_path)
+    pml_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [f"# {header}"] if header else []
+    lines += contacts_pymol_commands(Path(structure_path).resolve(), highlight, chain_colors)
+    pml_path.write_text("\n".join(lines) + "\n")
+    return pml_path
+
+
+def render_contacts(
+    structure_path: str | Path,
+    out_png: str | Path,
+    highlight: dict[str, list[int]],
+    chain_colors: dict[str, str],
+    width: int = 1400,
+    height: int = 1150,
+    dpi: int = 300,
+    timeout: int = 300,
+) -> Path | None:
+    """Ray-traced PNG with interface residues highlighted; None if no PyMOL."""
+    exe = find_pymol()
+    structure_path = Path(structure_path)
+    if exe is None or not structure_path.exists():
+        return None
+    out_png = Path(out_png)
+    out_png.parent.mkdir(parents=True, exist_ok=True)
+
+    commands = contacts_pymol_commands(structure_path.resolve(), highlight, chain_colors)
+    script = "from pymol import cmd\n" + "\n".join(
+        f"cmd.do({line!r})" for line in commands
+    )
+    script += f"\ncmd.ray({width}, {height})\ncmd.png({str(out_png)!r}, dpi={dpi})\n"
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as fh:
+        fh.write(script)
+        script_path = fh.name
+    try:
+        result = subprocess.run(
+            [exe, "-cq", script_path],
+            capture_output=True, timeout=timeout, check=False,
+        )
+        if result.returncode != 0 or not out_png.exists():
+            return None
+        return out_png
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    finally:
+        try:
+            os.unlink(script_path)
+        except OSError:
+            pass
+
+
 def render_structure(
     structure_path: str | Path,
     out_png: str | Path,

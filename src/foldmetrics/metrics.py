@@ -375,6 +375,81 @@ def compute_summary(
     return summary
 
 
+DEFAULT_CONTACT_PAE_CUTOFF = 12.0  # Å; "low PAE" threshold (Zhang 2022)
+
+
+def find_contacts(
+    pred: Prediction,
+    dist_cutoff: float = DEFAULT_DIST_CUTOFF,
+    pae_cutoff: float | None = DEFAULT_CONTACT_PAE_CUTOFF,
+) -> list[dict[str, Any]]:
+    """Confident inter-chain contacts: close in space AND low PAE.
+
+    A residue/atom token pair (one from each chain) is a contact when the
+    contact-atom distance is <= ``dist_cutoff`` and, if a PAE matrix exists,
+    both PAE directions are below ``pae_cutoff``. This mirrors the
+    interface-contact criteria of Zhang et al. 2022 (Protein Sci. 31:e4479):
+    interface residue pairs within 8 Å, kept only when the model is
+    confident about their relative placement (low PAE, <= 12 Å there).
+
+    Ligand atom tokens participate, so protein-ligand binding-site contacts
+    are reported too. Without a PAE matrix the distance criterion alone
+    applies and the PAE columns are NaN. ``pae_cutoff=None`` disables the
+    PAE filter.
+    """
+    rows: list[dict[str, Any]] = []
+    coords = pred.coords
+    for chain_a, chain_b in combinations(pred.chains, 2):
+        idx_a = pred.token_idx(chain_a)
+        idx_b = pred.token_idx(chain_b)
+        if idx_a.size == 0 or idx_b.size == 0:
+            continue
+        diff = coords[idx_a][:, None, :] - coords[idx_b][None, :, :]
+        dist = np.linalg.norm(diff, axis=-1)
+        ii, jj = np.where(dist <= dist_cutoff)
+        if ii.size == 0:
+            continue
+
+        if pred.pae is not None:
+            pae_ab = pred.pae[idx_a[ii], idx_b[jj]]
+            pae_ba = pred.pae[idx_b[jj], idx_a[ii]]
+            if pae_cutoff is not None:
+                keep = np.maximum(pae_ab, pae_ba) < pae_cutoff
+            else:
+                keep = np.ones(ii.size, dtype=bool)
+        else:
+            pae_ab = pae_ba = None
+            keep = np.ones(ii.size, dtype=bool)
+
+        for k in np.where(keep)[0]:
+            i = int(idx_a[ii[k]])
+            j = int(idx_b[jj[k]])
+            ta, tb = pred.tokens[i], pred.tokens[j]
+            rows.append(
+                {
+                    "chain_a": chain_a,
+                    "res_a": ta.res_id,
+                    "resname_a": ta.res_name,
+                    "atom_a": ta.atom_name,
+                    "kind_a": ta.kind,
+                    "chain_b": chain_b,
+                    "res_b": tb.res_id,
+                    "resname_b": tb.res_name,
+                    "atom_b": tb.atom_name,
+                    "kind_b": tb.kind,
+                    "distance": float(dist[ii[k], jj[k]]),
+                    "pae_ab": float(pae_ab[k]) if pae_ab is not None else float("nan"),
+                    "pae_ba": float(pae_ba[k]) if pae_ba is not None else float("nan"),
+                    "plddt_a": ta.plddt,
+                    "plddt_b": tb.plddt,
+                    "token_a": i,
+                    "token_b": j,
+                }
+            )
+    rows.sort(key=lambda r: (r["chain_a"], r["chain_b"], r["distance"]))
+    return rows
+
+
 def compute_all(
     pred: Prediction,
     pae_cutoff: float = DEFAULT_PAE_CUTOFF,

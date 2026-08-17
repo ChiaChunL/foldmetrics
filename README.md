@@ -1,6 +1,18 @@
-# foldmetrics
+<div align="center">
+<img src="https://raw.githubusercontent.com/ChiaChunL/foldmetrics/main/docs/assets/foldmetrics_banner.svg" alt="foldmetrics" width="78%">
+</div>
 
-Unified confidence metrics for structure-prediction models.
+-----------------
+
+# foldmetrics: unified confidence metrics for structure-prediction models
+
+| | |
+|---|---|
+| Testing | [![CI](https://github.com/ChiaChunL/foldmetrics/actions/workflows/ci.yml/badge.svg)](https://github.com/ChiaChunL/foldmetrics/actions/workflows/ci.yml) |
+| Package | [![PyPI Latest Release](https://img.shields.io/pypi/v/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) [![Python versions](https://img.shields.io/pypi/pyversions/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) [![PyPI Downloads](https://img.shields.io/pypi/dm/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) |
+| Meta | [![License - MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) |
+
+## 🧬 What is it?
 
 `foldmetrics` ingests the raw output folders of the mainstream structure
 predictors — **AlphaFold2 / AlphaFold-Multimer, ColabFold, AlphaFold3, Boltz,
@@ -19,17 +31,23 @@ for a single model or whole batches:
 | `pdockq` | interface score from contacts + pLDDT (Bryant 2022) | computed |
 | `pdockq2` | interface score from contacts + pLDDT + PAE (Zhu 2023) | computed |
 | `lis` | Local Interaction Score from PAE (Kim 2024) | computed |
+| `dockq` | true interface accuracy vs a reference structure (Basu & Wallner 2016) | computed, optional |
 
-Computed metrics were validated against the `ipsae.py` reference
-implementation (Dunbrack Lab), including its exact `d0` conventions.
+Beyond scores it extracts **confident interface contacts** (distance + PAE
+filtered residue pairs, with PyMOL scripts) and renders
+**publication-oriented figures**.
 
-## Install
+## 📦 Installation
 
 ```bash
 pip install foldmetrics
 ```
 
-(conda-forge packaging is planned; until then use pip inside a conda env.)
+With DockQ support (reference-based scoring):
+
+```bash
+pip install "foldmetrics[dockq]"
+```
 
 Development install:
 
@@ -38,7 +56,7 @@ git clone https://github.com/ChiaChunL/foldmetrics.git && cd foldmetrics
 pip install -e ".[dev]"
 ```
 
-## Quickstart
+## ⚡ Quickstart
 
 CLI (`foldmetrics`, short alias `fmx`):
 
@@ -46,7 +64,7 @@ CLI (`foldmetrics`, short alias `fmx`):
 # score every prediction found under a directory (any mix of tools)
 foldmetrics score path/to/predictions/ -o metrics.tsv
 
-# per chain-pair breakdown + summary figures (pLDDT track, PAE heatmap, metrics)
+# per chain-pair breakdown + summary figures (structure, pLDDT, PAE, metrics)
 fmx score preds/ -o metrics.tsv --interfaces interfaces.tsv --plot plots/
 
 # a single model: point at any of its files
@@ -56,11 +74,14 @@ fmx score run1/fold_job_full_data_0.json
 fmx ipsae preds/ --interfaces ipsae_per_pair.tsv
 fmx score preds/ --metrics ipsae,pdockq2,lis
 
+# confident interface contacts (+ figure + PyMOL script)
+fmx contacts preds/ -o contacts.tsv --plot plots/
+
+# DockQ against an experimental / reference structure
+fmx dockq preds/ --ref native.pdb -o dockq.tsv
+
 # what would be scored?
 fmx detect preds/
-
-# figures only
-fmx plot preds/ -o plots/
 ```
 
 Python:
@@ -68,22 +89,22 @@ Python:
 ```python
 import foldmetrics as fm
 
-df = fm.evaluate("path/to/predictions/")          # one row per model
+df = fm.evaluate("path/to/predictions/")              # one row per model
 dfi = fm.evaluate_interfaces("path/to/predictions/")  # one row per chain pair
 
-# lower-level access
 preds = fm.load_predictions("path/to/predictions/")
 summary, interfaces = fm.compute_all(preds[0])
+contacts = fm.find_contacts(preds[0], dist_cutoff=8.0, pae_cutoff=12.0)
 ```
 
-More recipes (including runnable demo data that needs no prediction tool) live
-in [examples/](examples/).
+More recipes (including runnable demo data that needs no prediction tool)
+live in [examples/](examples/).
 
-## Visualization
+## 🖼️ Visualization
 
 `--plot DIR` (on `score` and every metric subcommand) or the `plot`
-subcommand renders publication-oriented figures, adapting automatically to
-the shape of the batch:
+subcommand renders figures that adapt automatically to the shape of the
+batch:
 
 | Input shape | Figures written into DIR |
 |---|---|
@@ -95,7 +116,8 @@ The structure panel uses **headless PyMOL** when available (auto-detected
 from `FOLDMETRICS_PYMOL`, PATH, or common conda locations; ~2–3 s per
 model) and falls back to a fast matplotlib backbone trace otherwise —
 select explicitly with `--renderer pymol|trace`. The `plot` subcommand also
-takes `--format png|pdf|svg` and `--dpi` (default 300).
+takes `--format png|pdf|svg` and `--dpi` (default 300). The pLDDT track is
+colored by the AlphaFold confidence bands (blue / cyan / yellow / orange).
 
 Single model (AlphaFold3, SARS-CoV-2 Mpro + nirmatrelvir):
 
@@ -109,7 +131,62 @@ Batch overview (one target, AlphaFold2 + AlphaFold3 models):
 
 ![batch overview](https://raw.githubusercontent.com/ChiaChunL/foldmetrics/main/docs/assets/demo_batch.png)
 
-## Supported tools and files
+## 🤝 Confident interface contacts
+
+`fmx contacts` extracts the inter-chain residue (and ligand-atom) pairs the
+model is *confident* about, following the interface-contact idea of Zhang
+et al. 2022: a pair is kept when the contact atoms are within
+`--dist-cutoff` (default 8 Å) **and** both PAE directions are below
+`--pae-cutoff` (default 12 Å; negative disables). Ligand atoms participate,
+so binding-site contacts are reported too.
+
+```bash
+fmx contacts preds/ -o contacts.tsv --plot plots/
+```
+
+Outputs per model: the contact table (residue pair, distance, both PAE
+directions, pLDDTs), a figure with the interface residues highlighted on
+the structure and overlaid on the PAE heatmap, and a ready-to-run
+`<model>_contacts.pml` with named PyMOL selections (`if_A`, `if_B`,
+`interface`) for interactive inspection.
+
+![contact map](https://raw.githubusercontent.com/ChiaChunL/foldmetrics/main/docs/assets/demo_contacts.png)
+
+## 🎯 DockQ against a reference
+
+When an experimental (or otherwise trusted) structure exists, `fmx dockq`
+computes the *actual* interface accuracy via the official DockQ
+implementation (install with `pip install "foldmetrics[dockq]"`):
+
+```bash
+fmx dockq preds/ --ref 1brs.pdb -o dockq.tsv
+fmx dockq preds/ --ref native.cif --mapping A:A,B:D   # explicit chain pairing
+fmx dockq preds/ --ref complex.cif --small-molecule   # score ligand poses too
+```
+
+Reports DockQ, fnat, iRMSD, LRMSD and the CAPRI-style class per interface.
+Chains are matched by name when both structures share names, otherwise by
+order — check the reported pairing (mmCIF label vs auth chain ids differ
+between tools) and override with `--mapping MODEL:REF,...`.
+
+## 📊 How to read the scores
+
+| Score | Guidance | Basis |
+|---|---|---|
+| pLDDT | > 90 very high (side chains reliable); 70–90 backbone confident; 50–70 low; < 50 likely disordered | AlphaFold confidence bands (Jumper 2021) |
+| pTM / ipTM | > 0.8 confident; 0.6–0.8 gray zone, inspect; < 0.6 likely wrong (interface) | AlphaFold-Multimer / AF3 guidance |
+| PAE | < 5 Å: relative placement of the two positions is reliable; > ~15 Å: unreliable | AlphaFold documentation |
+| pDockQ | > 0.23 acceptable or better; > 0.5 confident | Bryant 2022 |
+| pDockQ2 | estimates DockQ, so DockQ classes apply: < 0.23 incorrect; ≥ 0.23 acceptable; ≥ 0.49 medium; ≥ 0.80 high | Zhu 2023; Basu & Wallner 2016 |
+| ipSAE | no published universal cutoff; in our 720-model validation known binders scored ≥ 0.88 and decoys ≤ 0.10 — values above ≈ 0.5 indicate a confidently predicted interface | Dunbrack 2025 + our validation |
+| LIS | higher is better; the authors propose ≈ 0.2 as the interaction cutoff | Kim 2024 |
+| DockQ | < 0.23 incorrect; 0.23–0.49 acceptable; 0.49–0.80 medium; ≥ 0.80 high | Basu & Wallner 2016 (CAPRI classes) |
+
+Single scores can mislead — pDockQ ignores PAE and can stay deceptively
+high on confidently-folded but wrongly-docked chains, which pDockQ2/ipSAE
+expose. Read them together (that is rather the point of this package).
+
+## 🧰 Supported tools and files
 
 | Tool | Detected files | pTM/ipTM | pLDDT | PAE |
 |---|---|---|---|---|
@@ -120,9 +197,13 @@ Batch overview (one target, AlphaFold2 + AlphaFold3 models):
 | Boltz-1/2 | `confidence_*_model_*.json` + `*_model_*.cif` + `pae_*.npz` / `plddt_*.npz` | yes | yes | yes |
 | Chai-1 | `scores.model_idx_*.npz` + `pred.model_idx_*.cif` | yes | yes | if exported |
 | Protenix | `*summary_confidence*.json` + matching `.cif` (+ `*full_data*.json` with `token_pair_pae`) | yes | yes | yes |
-| HelixFold3 | planned | — | — | — |
 
-## Validation
+Native per-tool extras (e.g. Boltz `complex_iplddt`/`ligand_iptm`, AF3
+`chain_pair_pae_min`, Chai clash flags) are preserved on
+`Prediction.extras` and chain-pair ipTM is surfaced as `iptm_native` in the
+interface table.
+
+## ✅ Validation
 
 - Numerical parity with the `ipsae.py` reference implementation (Dunbrack
   Lab) verified digit-for-digit on real AlphaFold3 server output: ipSAE
@@ -134,14 +215,9 @@ Batch overview (one target, AlphaFold2 + AlphaFold3 models):
   controls — with zero parse errors; known binders score ipSAE 0.9+, decoy
   pairs < 0.1, monomers report NA.
 - ColabFold and Chai-1 parsers are currently validated on synthetic
-  fixtures only; real-output samples welcome.
+  fixtures only; real-output samples welcome (please open an issue).
 
-Native per-tool extras (e.g. Boltz `complex_iplddt`/`ligand_iptm`, AF3
-`chain_pair_pae_min`, Chai clash flags) are preserved on
-`Prediction.extras` and chain-pair ipTM is surfaced as `iptm_native` in the
-interface table.
-
-## What each metric needs
+## 📋 What each metric needs
 
 The structure file is always required (it defines chains and tokens); the
 table shows which additional inputs each metric consumes. When an input is
@@ -156,18 +232,22 @@ nothing crashes.
 | `pdockq` | yes | yes | – | contacts at 8 Å between CB/C3' atoms |
 | `pdockq2` | yes | yes | yes | |
 | `ipsae`, `lis` | – | – | yes | chain mapping from the structure |
+| `contacts` | reported | yes | recommended | distance always; PAE filter when present |
+| `dockq` | – | yes | – | plus a reference structure (`--ref`) |
 
-## Outputs and paths
+## 📁 Outputs and paths
 
 - Summary table → stdout; `-o FILE` writes it. The extension picks the
   format: `.tsv` (default), `.csv`, `.json`; missing values are `NA`.
 - `--interfaces FILE` → the per chain-pair table (same formats).
-- `--plot DIR` → figures as described under Visualization; model names are
-  sanitized (`[^\w.-]` → `_`) for use as filenames.
+- `--plot DIR` → figures as described under Visualization; `contacts
+  --plot` adds `<model>_contacts.png` + `<model>_contacts.pml`. Model names
+  are sanitized (`[^\w.-]` → `_`) for use as filenames.
 - `plot -o DIR` defaults to `./foldmetrics_plots/`.
-- Exit codes: `0` success, `1` nothing recognized/found, `2` bad arguments.
+- Exit codes: `0` success, `1` nothing recognized/found, `2` bad arguments
+  or missing optional dependency.
 
-## Conventions worth knowing
+## 💡 Conventions worth knowing
 
 - **Tokens.** Standard residues are one token; ligands and modified residues
   are one token per heavy atom (AF3-style), so token-level PAE matrices line
@@ -187,7 +267,7 @@ nothing crashes.
   the aggregate used everywhere else (max for ipSAE/pDockQ2, mean for LIS,
   matching the reference implementations).
 
-## References
+## 📚 References
 
 - Bryant P, Pozzati G, Elofsson A. *Improved prediction of protein-protein
   interactions using AlphaFold2.* Nat Commun 13, 1265 (2022). — pDockQ
@@ -198,14 +278,13 @@ nothing crashes.
   bioRxiv 10.1101/2025.02.10.637595 (2025). — ipSAE
 - Kim AR et al. *Enhanced protein-protein interaction discovery via
   AlphaFold-Multimer.* bioRxiv 10.1101/2024.02.19.580970 (2024). — LIS
+- Basu S, Wallner B. *DockQ: A quality measure for protein-protein docking
+  models.* PLoS ONE 11, e0161879 (2016); Mirabello C, Wallner B. *DockQ v2.*
+  Bioinformatics (2024). — DockQ
+- Zhang J, Pei J, Durham J, Bos T, Cong Q. *Computed cancer interactome
+  explains the effects of somatic mutations in cancers.* Protein Sci 31,
+  e4479 (2022). — confident-contact criteria
 
-## Roadmap
+## 📄 License
 
-- HelixFold3 parser (sample outputs welcome — please open an issue)
-- Real-output samples for ColabFold and Chai-1
-- Per-interface PAE/ipSAE figures; interactive HTML report
-- conda-forge feedstock; CI (lint + tests) on GitHub Actions
-
-## License
-
-MIT
+[MIT](LICENSE)

@@ -61,6 +61,27 @@ fmx score demo_predictions --metrics ipsae,lis  # any subset
 Available names: `ptm`, `iptm`, `ranking`, `plddt`, `pae`, `ipsae`,
 `pdockq`, `pdockq2`, `lis`.
 
+### Confident interface contacts
+
+```bash
+fmx contacts demo_predictions -o contacts.tsv --plot plots
+fmx contacts preds/ --dist-cutoff 6 --pae-cutoff 10     # stricter
+fmx contacts preds/ --pae-cutoff -1                     # distance-only
+```
+
+Writes the residue-pair table, a contact figure (structure highlight + PAE
+overlay), and a `<model>_contacts.pml` PyMOL script with `if_<chain>` /
+`interface` selections.
+
+### DockQ vs a reference structure
+
+Requires `pip install "foldmetrics[dockq]"`:
+
+```bash
+fmx dockq preds/ --ref native.pdb -o dockq.tsv
+fmx dockq preds/ --ref native.cif --mapping A:A,B:D    # model:reference chains
+```
+
 ### Other commands
 
 ```bash

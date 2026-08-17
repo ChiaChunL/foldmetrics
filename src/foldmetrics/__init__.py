@@ -13,7 +13,12 @@ from foldmetrics.api import (
     evaluate_interfaces,
     load_predictions,
 )
-from foldmetrics.metrics import compute_all, compute_interfaces, compute_summary
+from foldmetrics.metrics import (
+    compute_all,
+    compute_interfaces,
+    compute_summary,
+    find_contacts,
+)
 from foldmetrics.models import Prediction, Token
 
 __all__ = [
@@ -26,5 +31,6 @@ __all__ = [
     "evaluate",
     "evaluate_full",
     "evaluate_interfaces",
+    "find_contacts",
     "load_predictions",
 ]

@@ -103,8 +103,13 @@ def add_protein_chain(
         res.name = "ALA"
         res.seqid = _seqid(i + 1)
         res.het_flag = "A"
-        res.add_atom(_atom("CA", "C", (x0 + i * spacing, y0 + 1.5, z0), plddt))
-        res.add_atom(_atom("CB", "C", (x0 + i * spacing, y0, z0), plddt))
+        x = x0 + i * spacing
+        # full backbone so external tools (e.g. DockQ) can superpose
+        res.add_atom(_atom("N", "N", (x - 1.2, y0 + 1.9, z0), plddt))
+        res.add_atom(_atom("CA", "C", (x, y0 + 1.5, z0), plddt))
+        res.add_atom(_atom("C", "C", (x + 1.3, y0 + 2.0, z0), plddt))
+        res.add_atom(_atom("O", "O", (x + 1.4, y0 + 3.2, z0), plddt))
+        res.add_atom(_atom("CB", "C", (x, y0, z0), plddt))
         chain.add_residue(res)
     model.add_chain(chain)
 

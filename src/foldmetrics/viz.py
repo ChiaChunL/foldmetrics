@@ -25,6 +25,7 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 from matplotlib.ticker import MaxNLocator
 
@@ -105,7 +106,22 @@ def plot_plddt(pred: Prediction, ax: plt.Axes) -> None:
     plddt = pred.plddt_arr
     for chain, start, stop in _chain_segments(pred):
         xs = np.arange(start, stop)
-        ax.plot(xs, plddt[start:stop], color=color_of[chain], lw=1.4, zorder=2)
+        ys = plddt[start:stop]
+        # AlphaFold-style: the curve itself is colored by the confidence band.
+        if len(xs) >= 2:
+            points = np.column_stack([xs, ys]).reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            seg_colors = [
+                _plddt_color((ys[k] + ys[k + 1]) / 2.0) for k in range(len(xs) - 1)
+            ]
+            ax.add_collection(
+                LineCollection(
+                    segments, colors=seg_colors, linewidths=1.7,
+                    zorder=2, capstyle="round",
+                )
+            )
+        else:
+            ax.scatter(xs, ys, s=12, color=_plddt_color(float(ys[0])), zorder=2)
         ax.text(
             (start + stop - 1) / 2.0,
             104.0,
@@ -331,6 +347,143 @@ def save_summary_plot(
     renderer: str = "auto",
 ) -> Path:
     fig = plot_summary(pred, pae_cutoff, dist_cutoff, renderer=renderer)
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=dpi, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    return path
+
+
+# ---------------------------------------------------------------- contact map
+def contact_highlight(contacts: list[dict]) -> dict[str, list[int]]:
+    """Interface residues per chain from a contact list."""
+    highlight: dict[str, set[int]] = {}
+    for row in contacts:
+        highlight.setdefault(row["chain_a"], set()).add(row["res_a"])
+        highlight.setdefault(row["chain_b"], set()).add(row["res_b"])
+    return {chain: sorted(res) for chain, res in highlight.items()}
+
+
+def _contacts_text(pred: Prediction, contacts: list[dict],
+                   dist_cutoff: float, pae_cutoff: float | None) -> str:
+    pae_txt = f"PAE < {pae_cutoff:g} Å (both directions)" if pae_cutoff else "no PAE filter"
+    lines = [
+        f"criteria      d ≤ {dist_cutoff:g} Å",
+        f"              {pae_txt}",
+        "",
+        f"contact pairs {len(contacts)}",
+    ]
+    pairs: dict[tuple[str, str], list[dict]] = {}
+    for row in contacts:
+        pairs.setdefault((row["chain_a"], row["chain_b"]), []).append(row)
+    if pairs:
+        lines += ["", "pair    pairs  res_a  res_b"]
+        for (a, b), rows in sorted(pairs.items()):
+            res_a = len({r["res_a"] for r in rows})
+            res_b = len({r["res_b"] for r in rows})
+            lines.append(f"{a}-{b:<6} {len(rows):>4}  {res_a:>5}  {res_b:>5}")
+    closest = sorted(contacts, key=lambda r: r["distance"])[:8]
+    if closest:
+        lines += ["", "closest contacts (Å):"]
+        for row in closest:
+            lines.append(
+                f"{row['chain_a']}/{row['resname_a']}{row['res_a']:<4} — "
+                f"{row['chain_b']}/{row['resname_b']}{row['res_b']:<4} {row['distance']:.1f}"
+            )
+    return "\n".join(lines)
+
+
+def _contact_structure_panel(
+    pred: Prediction, fig: plt.Figure, slot: Any, renderer: str,
+    highlight: dict[str, list[int]],
+) -> None:
+    color_of = {c: chain_color(i) for i, c in enumerate(pred.chains)}
+    image = None
+    if renderer in ("auto", "pymol"):
+        from foldmetrics.render import render_contacts
+
+        tmp = Path(tempfile.mkstemp(suffix=".png")[1])
+        try:
+            if render_contacts(pred.source, tmp, highlight, color_of) is not None:
+                image = plt.imread(str(tmp))
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+    if image is not None:
+        ax = fig.add_subplot(slot)
+        ax.imshow(image)
+        ax.set_axis_off()
+    else:
+        ax = fig.add_subplot(slot, projection="3d")
+        plot_structure_trace(pred, ax)
+        highlight_tokens = [
+            i for i, t in enumerate(pred.tokens)
+            if t.res_id in set(highlight.get(t.chain, []))
+        ]
+        if highlight_tokens:
+            xyz = pred.coords[highlight_tokens]
+            colors = [color_of[pred.tokens[i].chain] for i in highlight_tokens]
+            ax.scatter(*xyz.T, s=20, c=colors, depthshade=False, zorder=4)
+    ax.set_title("Interface residues highlighted", fontsize=8, color=MUTED, pad=2)
+
+
+def plot_contact_map(
+    pred: Prediction,
+    contacts: list[dict],
+    dist_cutoff: float = 8.0,
+    pae_cutoff: float | None = 12.0,
+    renderer: str = "auto",
+) -> plt.Figure:
+    """Confident-contact figure: highlighted structure + PAE with contact overlay."""
+    highlight = contact_highlight(contacts)
+
+    if pred.has_pae:
+        fig = plt.figure(figsize=(13.5, 5.6))
+        gs = fig.add_gridspec(1, 3, width_ratios=[1.3, 1.5, 0.75], wspace=0.25)
+        ax_pae = fig.add_subplot(gs[0, 1])
+        ax_text = fig.add_subplot(gs[0, 2])
+        structure_slot = gs[0, 0]
+        plot_pae(pred, ax_pae)
+        if contacts:
+            rows = [r["token_a"] for r in contacts] + [r["token_b"] for r in contacts]
+            cols = [r["token_b"] for r in contacts] + [r["token_a"] for r in contacts]
+            ax_pae.scatter(
+                cols, rows, s=9, facecolor="#D55E00", edgecolor="white",
+                linewidths=0.3, alpha=0.9, zorder=3, label="contact",
+            )
+            ax_pae.legend(
+                loc="lower left", bbox_to_anchor=(0.0, 1.03), frameon=False, fontsize=7
+            )
+    else:
+        fig = plt.figure(figsize=(9.5, 5.2))
+        gs = fig.add_gridspec(1, 2, width_ratios=[1.5, 1.0], wspace=0.2)
+        ax_text = fig.add_subplot(gs[0, 1])
+        structure_slot = gs[0, 0]
+
+    _contact_structure_panel(pred, fig, structure_slot, renderer, highlight)
+    ax_text.axis("off")
+    ax_text.text(
+        0.0, 1.0, _contacts_text(pred, contacts, dist_cutoff, pae_cutoff),
+        transform=ax_text.transAxes, va="top", ha="left",
+        family="monospace", fontsize=7.5, color=INK,
+    )
+    fig.suptitle(f"{pred.name} — confident interface contacts", color=INK, fontsize=11)
+    return fig
+
+
+def save_contact_plot(
+    pred: Prediction,
+    contacts: list[dict],
+    path: str | Path,
+    dist_cutoff: float = 8.0,
+    pae_cutoff: float | None = 12.0,
+    renderer: str = "auto",
+    dpi: int = 300,
+) -> Path:
+    fig = plot_contact_map(pred, contacts, dist_cutoff, pae_cutoff, renderer)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=dpi, bbox_inches="tight", facecolor="white")
