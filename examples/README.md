@@ -1,96 +1,91 @@
 # Examples
 
-Everything here runs without any prediction tool installed: `make_demo_data.py`
-generates realistic synthetic AlphaFold3-style outputs to play with. Substitute
-your real prediction folders anywhere a `demo_predictions` path appears.
+[`data/`](data/) contains **real prediction outputs** (barnase–barstar by
+three tools, plus SARS-CoV-2 Mpro + nirmatrelvir by AlphaFold3) so every
+command below runs as-is from the repository root — no prediction tool
+needed:
 
-```bash
-python examples/make_demo_data.py demo_predictions
 ```
-
-## CLI recipes
+examples/data/
+├── af3_server/       AlphaFold Server download   (cif + summary + full_data)
+├── af2_multimer/     AlphaFold2-Multimer, JSON layout
+├── boltz2/           Boltz-2                     (cif + json + npz)
+└── af3_mpro_ligand/  AlphaFold3 local, protein + small-molecule ligand
+```
 
 `fmx` is a short alias for `foldmetrics`; they are identical.
 
-### Score a batch (any mix of supported tools, scanned recursively)
+## Score everything (any mix of tools, auto-detected)
 
 ```bash
-fmx score demo_predictions -o metrics.tsv --interfaces interfaces.tsv --plot plots
+fmx score examples/data -o metrics.tsv --interfaces interfaces.tsv --plot plots
 ```
 
-stdout (also written to `metrics.tsv`; missing values are written as `NA`):
+Real output (note the chain-naming diversity across tools — handled
+transparently):
 
 ```
-                   model       tool chains  n_chains  n_tokens  n_res   ptm  iptm  ranking_score  plddt_mean  iplddt  pae_mean  ipae_mean  ipsae  pdockq  pdockq2   lis  n_interfaces  has_pae
-complex_with_ligand_poor alphafold3  A,B,C         3       180    170 0.680 0.380          0.450      69.624  68.924    12.315     19.943  0.266   0.467    0.011 0.473             1     True
-              dimer_good alphafold3    A,B         2       195    195 0.870 0.820          0.840      88.462  88.645     3.824      4.310  0.488   0.712    0.436 0.641             1     True
- receptor_peptide_medium alphafold3    A,B         2       170    170 0.720 0.550          0.580      81.796  72.580     6.130     11.326  0.052   0.278    0.029 0.142             1     True
+                            model       tool   ptm  iptm  ranking_score  plddt_mean  ipsae  pdockq  pdockq2   lis
+       model_1_multimer_v3_pred_0 alphafold2 0.945 0.937          0.939      98.094  0.897   0.535    0.952 0.787
+                mpro_nirmatrelvir alphafold3 0.950 0.970          0.970      97.527  0.836      NA       NA 0.690
+fold_barnase_barstar_s318_model_0 alphafold3 0.940 0.930          0.930      97.487  0.890   0.528    0.944 0.777
+          barnase_barstar_model_0      boltz 0.965 0.959          0.965      96.702  0.935   0.498    0.939 0.780
 ```
 
-Reading `complex_with_ligand_poor` is instructive: `pdockq` is deceptively
-decent (0.47 — it only sees contacts and pLDDT) while `pdockq2` (0.011) and the
-per-pair ipSAE expose the bad protein–protein interface; the summary `ipsae`
-(0.266) comes from the *best* interface, which is the protein–ligand pair.
-The `--interfaces` table shows exactly this breakdown per chain pair, including
-the two directional values (`*_ab`, `*_ba`) and the tool's own chain-pair ipTM
-(`iptm_native`).
+(`mpro_nirmatrelvir` shows `NA` for pDockQ/pDockQ2 because its only
+interface is protein–ligand; its ipSAE/LIS come from ligand-token scoring.)
 
-`--plot plots/` writes one summary figure per model (pLDDT-colored structure
-+ pLDDT track + PAE heatmap + metrics panel), plus `batch_overview.png` when
-there are several models, plus `comparison.png` (targets x methods, one panel
-per metric) when the batch spans several targets or tools. The structure
-panel uses headless PyMOL when installed (auto-detected; ~2-3 s per model) and
-a fast matplotlib backbone trace otherwise:
+## Single metrics
+
+Every metric name is also a subcommand:
 
 ```bash
-fmx plot demo_predictions -o plots --renderer trace   # fast, no PyMOL
-fmx plot demo_predictions -o plots --format pdf       # vector output
-```
-
-### Single metrics
-
-Every metric name is also a subcommand, so computing just one metric over a
-batch is:
-
-```bash
-fmx ipsae demo_predictions                      # only ipSAE columns
-fmx pdockq2 demo_predictions -o pdockq2.tsv     # same options as 'score'
-fmx score demo_predictions --metrics ipsae,lis  # any subset
+fmx ipsae examples/data                     # only ipSAE columns
+fmx pdockq2 examples/data -o pdockq2.tsv    # same options as 'score'
+fmx score examples/data --metrics ipsae,lis # any subset
 ```
 
 Available names: `ptm`, `iptm`, `ranking`, `plddt`, `pae`, `ipsae`,
 `pdockq`, `pdockq2`, `lis`.
 
-### Confident interface contacts
+## Confident interface contacts
 
 ```bash
-fmx contacts demo_predictions -o contacts.tsv --plot plots
-fmx contacts preds/ --dist-cutoff 6 --pae-cutoff 10     # stricter
-fmx contacts preds/ --pae-cutoff -1                     # distance-only
+fmx contacts examples/data/af3_server -o contacts.tsv --plot plots
+fmx contacts examples/data/af3_mpro_ligand --plot plots   # drug binding site
+fmx contacts preds/ --dist-cutoff 6 --pae-cutoff 10       # stricter
 ```
 
-Writes the residue-pair table, a contact figure (structure highlight + PAE
-overlay), and a `<model>_contacts.pml` PyMOL script with `if_<chain>` /
-`interface` selections.
+Writes the residue-pair table, a figure (structure highlight + PAE overlay)
+and a `<model>_contacts.pml` PyMOL script with `if_<chain>` / `interface`
+selections. On the barnase–barstar example the closest extracted contacts
+are the literature hotspots (R59/R83/R87/H102 against D35/D39).
 
-### DockQ vs a reference structure
+## DockQ vs a reference structure
 
-Requires `pip install "foldmetrics[dockq]"`:
+Requires `pip install "foldmetrics[dockq]"`. Here the AlphaFold Server
+model serves as the reference for the AlphaFold2 model of the same complex:
 
 ```bash
-fmx dockq preds/ --ref native.pdb -o dockq.tsv
-fmx dockq preds/ --ref native.cif --mapping A:A,B:D    # model:reference chains
+fmx dockq examples/data/af2_multimer --ref examples/data/af3_server/fold_barnase_barstar_s318_model_0.cif
 ```
 
-### Other commands
+```
+                     model       tool interface native_pair  dockq dockq_class  fnat  irmsd  lrmsd  total_dockq
+model_1_multimer_v3_pred_0 alphafold2       B-C          AB  0.973        high 0.964  0.309  0.537        0.973
+```
+
+Chains were paired automatically by order (AF2 names them B,C; the
+reference uses A,B) — override with `--mapping MODEL:REF,...` when needed.
+
+## Other commands
 
 ```bash
-fmx detect demo_predictions            # list what would be scored, per tool
-fmx plot demo_predictions -o plots     # figures only
+fmx detect examples/data               # list what would be scored, per tool
+fmx plot examples/data -o plots        # figures only (batch + comparison views)
+fmx plot examples/data --renderer trace --format pdf   # fast, vector output
 fmx score run1/fold_x_full_data_0.json # a single model, via any of its files
 fmx score preds/ --tool boltz          # restrict auto-detection to one tool
-fmx score preds/ --pae-cutoff 15       # loosen the ipSAE PAE cutoff
-fmx score run1/ run2/ model_dir/       # any number of paths
 ```
 
 Output formats follow the file extension: `.tsv` (default), `.csv`, `.json`.
@@ -100,7 +95,7 @@ Output formats follow the file extension: `.tsv` (default), `.csv`, `.json`.
 See [python_api.py](python_api.py) for a complete walkthrough:
 
 ```bash
-python examples/python_api.py demo_predictions
+python examples/python_api.py examples/data
 ```
 
 It covers:
@@ -109,5 +104,6 @@ It covers:
 2. `fm.evaluate_interfaces(path)` — per chain-pair DataFrame
 3. `fm.load_predictions` + `fm.compute_all` — full access to one model,
    including per-residue ipSAE profiles via `foldmetrics.metrics.ipsae_asym`
-4. Figures: `save_summary_plot`, `save_batch_plot`, and composing your own
+4. `fm.find_contacts` — confident-contact extraction
+5. Figures: `save_summary_plot`, `save_batch_plot`, and composing your own
    figure from `plot_plddt` / `plot_pae`

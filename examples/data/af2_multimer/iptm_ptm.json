@@ -1,0 +1,77 @@
+{
+ "model_1_multimer_v3_pred_0": {
+  "iptm": 0.9369155168533325,
+  "ptm": 0.9454223950428532,
+  "ranking_confidence": 0.9386168924912367
+ },
+ "model_1_multimer_v3_pred_1": {
+  "iptm": 0.9365836381912231,
+  "ptm": 0.9453409831851565,
+  "ranking_confidence": 0.9383351071900099
+ },
+ "model_1_multimer_v3_pred_2": {
+  "iptm": 0.9370207190513611,
+  "ptm": 0.9453932714346632,
+  "ranking_confidence": 0.9386952295280215
+ },
+ "model_2_multimer_v3_pred_0": {
+  "iptm": 0.9341820478439331,
+  "ptm": 0.9433932510577627,
+  "ranking_confidence": 0.9360242884866992
+ },
+ "model_2_multimer_v3_pred_1": {
+  "iptm": 0.93412184715271,
+  "ptm": 0.9431587460178118,
+  "ranking_confidence": 0.9359292269257304
+ },
+ "model_2_multimer_v3_pred_2": {
+  "iptm": 0.934887170791626,
+  "ptm": 0.943778090393621,
+  "ranking_confidence": 0.9366653547120251
+ },
+ "model_3_multimer_v3_pred_0": {
+  "iptm": 0.9307854175567627,
+  "ptm": 0.9409429616191687,
+  "ranking_confidence": 0.932816926369244
+ },
+ "model_3_multimer_v3_pred_1": {
+  "iptm": 0.9302393198013306,
+  "ptm": 0.9404925197339571,
+  "ranking_confidence": 0.9322899597878559
+ },
+ "model_3_multimer_v3_pred_2": {
+  "iptm": 0.9294918775558472,
+  "ptm": 0.9402130659028687,
+  "ranking_confidence": 0.9316361152252515
+ },
+ "model_4_multimer_v3_pred_0": {
+  "iptm": 0.9354079961776733,
+  "ptm": 0.9442794672932385,
+  "ranking_confidence": 0.9371822904007865
+ },
+ "model_4_multimer_v3_pred_1": {
+  "iptm": 0.9359691143035889,
+  "ptm": 0.9449308307450821,
+  "ranking_confidence": 0.9377614575918876
+ },
+ "model_4_multimer_v3_pred_2": {
+  "iptm": 0.9349874258041382,
+  "ptm": 0.9437370114115814,
+  "ranking_confidence": 0.9367373429256269
+ },
+ "model_5_multimer_v3_pred_0": {
+  "iptm": 0.9322620630264282,
+  "ptm": 0.9422040449440552,
+  "ranking_confidence": 0.9342504594099537
+ },
+ "model_5_multimer_v3_pred_1": {
+  "iptm": 0.9328604340553284,
+  "ptm": 0.9424360714491544,
+  "ranking_confidence": 0.9347755615340936
+ },
+ "model_5_multimer_v3_pred_2": {
+  "iptm": 0.9334895610809326,
+  "ptm": 0.9431600513295804,
+  "ranking_confidence": 0.9354236591306622
+ }
+}

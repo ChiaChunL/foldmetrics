@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "foldmetrics"
 description = "Unified confidence metrics (pTM, ipTM, pLDDT, ipLDDT, PAE, ipSAE, pDockQ, pDockQ2, LIS) for AlphaFold2/3, ColabFold, Boltz, Chai-1 and Protenix predictions"
 readme = "README.md"
-license = "MIT"
+license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "Jiajun Li", email = "ChiaChun.Le@gmail.com" }]

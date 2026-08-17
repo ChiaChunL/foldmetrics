@@ -1,9 +1,8 @@
-"""Python API walkthrough.
+"""Python API walkthrough, using the real predictions in examples/data.
 
-Usage::
+Usage (from the repository root)::
 
-    python examples/make_demo_data.py demo_predictions
-    python examples/python_api.py demo_predictions
+    python examples/python_api.py examples/data
 """
 
 from __future__ import annotations
@@ -49,8 +48,16 @@ def main(path: str) -> None:
         print(f"  best aligned residue for {a}->{b}: token {result.best_token} "
               f"(byres max {result.value:.3f}, n0res={result.n0res})")
 
-    # 4. Figures -------------------------------------------------------------
-    # Ready-made one-page summary (pLDDT track + PAE heatmap + metrics):
+    # 4. Confident interface contacts ---------------------------------------
+    contacts = fm.find_contacts(pred, dist_cutoff=8.0, pae_cutoff=12.0)
+    print(f"  {len(contacts)} confident contacts; closest:")
+    for row in sorted(contacts, key=lambda r: r["distance"])[:3]:
+        print(f"    {row['chain_a']}/{row['resname_a']}{row['res_a']} - "
+              f"{row['chain_b']}/{row['resname_b']}{row['res_b']}  "
+              f"{row['distance']:.1f} A (PAE {row['pae_ab']:.1f}/{row['pae_ba']:.1f})")
+
+    # 5. Figures -------------------------------------------------------------
+    # Ready-made one-page summary (structure + pLDDT track + PAE + metrics):
     save_summary_plot(pred, out / f"{pred.name}_summary.png")
 
     # Batch overview across every model scored above:
@@ -69,4 +76,4 @@ def main(path: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "demo_predictions")
+    main(sys.argv[1] if len(sys.argv) > 1 else "examples/data")

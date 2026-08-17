@@ -22,5 +22,6 @@ htmlcov/
 
 # Local outputs
 foldmetrics_plots/
+example_output/
 *.tsv
 !tests/**/*.tsv
