@@ -77,6 +77,12 @@ class ColabFoldParser(ToolParser):
             extras["ranking_score_note"] = "computed as 0.8*ipTM + 0.2*pTM"
         if "max_pae" in data:
             extras["max_pae"] = as_float(data["max_pae"])
+        # recent ColabFold embeds its own per chain-pair interface scores
+        # (note: its ipSAE uses PAE cutoff 15 Å, not the ipsae.py default 10);
+        # preserve them so users can cross-check against our computed columns
+        for key in ("ipsae", "pdockq", "pdockq2", "actifptm"):
+            if key in data:
+                extras[f"colabfold_{key}"] = data[key]
 
         return Prediction(
             name=unit.name,

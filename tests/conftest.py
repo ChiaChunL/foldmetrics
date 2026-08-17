@@ -167,6 +167,10 @@ def write_colabfold_dir(directory: Path, n_a: int = 30, n_b: int = 30) -> Path:
         "ptm": 0.78,
         "iptm": 0.66,
         "max_pae": 31.75,
+        # recent ColabFold embeds its own interface scores (PAE cutoff 15)
+        "ipsae": {"A-B": 0.91, "B-A": 0.90},
+        "pdockq": {"A-B": 0.52},
+        "pdockq2": {"A-B": 0.93, "B-A": 0.92},
     }
     (directory / f"job_scores_{tag}.json").write_text(json.dumps(scores))
     return directory

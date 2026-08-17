@@ -26,6 +26,9 @@ def test_colabfold_end_to_end(tmp_path):
     assert math.isclose(pred.ptm, 0.78)
     assert math.isclose(pred.iptm, 0.66)
     assert math.isclose(pred.ranking_score, 0.8 * 0.66 + 0.2 * 0.78)
+    # ColabFold's own embedded interface scores are preserved for comparison
+    assert pred.extras["colabfold_ipsae"]["A-B"] == 0.91
+    assert pred.extras["colabfold_pdockq2"]["B-A"] == 0.92
 
     df = evaluate(pred)
     row = df.iloc[0]
