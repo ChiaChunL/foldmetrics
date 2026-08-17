@@ -68,6 +68,14 @@ path = "src/foldmetrics/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/foldmetrics"]
 
+[tool.hatch.build.targets.sdist]
+# ship a lean source archive
+exclude = [
+    "dist",
+    "foldmetrics_plots",
+    "example_output",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
