@@ -76,7 +76,10 @@ model_1_multimer_v3_pred_0 alphafold2       B-C          AB  0.973        high 0
 ```
 
 Chains were paired automatically by order (AF2 names them B,C; the
-reference uses A,B) — override with `--mapping MODEL:REF,...` when needed.
+reference uses A,B) — override with `--mapping MODEL:REF,...`, or use
+`--best-mapping` to search every assignment (recommended for
+homo-multimers). More switches: `--small-molecule`, `--no-align`,
+`--low-memory`, `--capri-peptide`.
 
 ## Other commands
 

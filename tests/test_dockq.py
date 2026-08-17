@@ -37,6 +37,16 @@ def test_dockq_self_comparison_is_perfect(tmp_path):
     assert rows[0]["irmsd"] < 1e-6
 
 
+def test_dockq_best_mapping(tmp_path):
+    from foldmetrics.dockq import compute_dockq
+
+    directory = write_colabfold_dir(tmp_path / "cf")
+    structure = next(directory.glob("*_unrelaxed_*.pdb"))
+    rows, total = compute_dockq(structure, structure, best_mapping=True)
+    assert math.isclose(total, 1.0, abs_tol=1e-6)
+    assert rows[0]["mapping"]  # the winning assignment is reported
+
+
 def test_dockq_cli(tmp_path, capsys):
     directory = write_colabfold_dir(tmp_path / "cf")
     structure = next(directory.glob("*_unrelaxed_*.pdb"))

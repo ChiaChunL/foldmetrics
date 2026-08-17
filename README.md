@@ -120,7 +120,9 @@ paths at once.
 | `--format {png,pdf,svg}` / `--dpi N` | plot | figure file format and resolution |
 | `--ref FILE` | dockq | reference structure to compare against (required) |
 | `--mapping A:A,B:D` | dockq | model:reference chain pairing |
+| `--best-mapping` | dockq | try every chain assignment, keep the best (homo-multimers) |
 | `--small-molecule` | dockq | also score small-molecule ligand poses |
+| `--no-align` / `--low-memory` / `--capri-peptide` | dockq | skip alignment · reduce memory · peptide criteria |
 
 `fmx <command> --help` prints the complete option list for any command.
 
@@ -185,13 +187,19 @@ implementation (install with `pip install "foldmetrics[dockq]"`):
 ```bash
 fmx dockq preds/ --ref 1brs.pdb -o dockq.tsv
 fmx dockq preds/ --ref native.cif --mapping A:A,B:D   # explicit chain pairing
+fmx dockq preds/ --ref homodimer.cif --best-mapping   # search all assignments
 fmx dockq preds/ --ref complex.cif --small-molecule   # score ligand poses too
 ```
 
-Reports DockQ, fnat, iRMSD, LRMSD and the CAPRI-style class per interface.
-Chains are matched by name when both structures share names, otherwise by
-order — check the reported pairing (mmCIF label vs auth chain ids differ
-between tools) and override with `--mapping MODEL:REF,...`.
+Reports DockQ, fnat, iRMSD, LRMSD, the CAPRI-style class and the chain
+`mapping` used, per interface. Chains are matched by name when both
+structures share names, otherwise by order — mmCIF label vs auth chain ids
+differ between tools, so check the `mapping` column. Override explicitly
+with `--mapping MODEL:REF,...`, or let `--best-mapping` try every
+assignment and keep the best total DockQ (recommended for homo-multimers;
+refused above 5 chains). Additional switches: `--no-align` (skip sequence
+alignment when residue numbering already matches), `--low-memory` (huge
+complexes), `--capri-peptide` (protein–peptide criteria).
 
 ## 📊 How to read the scores
 

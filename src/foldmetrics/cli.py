@@ -158,12 +158,26 @@ def build_parser() -> argparse.ArgumentParser:
              "(default: by name when both structures share chain names, else by order)",
     )
     p_dockq.add_argument(
+        "--best-mapping", action="store_true",
+        help="search every chain assignment and keep the best total DockQ "
+             "(recommended for homo-multimers; refused above 5 chains)",
+    )
+    p_dockq.add_argument(
         "--small-molecule", action="store_true",
         help="also score small-molecule ligand poses (DockQ small_molecule mode)",
     )
     p_dockq.add_argument(
         "--capri-peptide", action="store_true",
         help="use CAPRI peptide criteria (for protein-peptide interfaces)",
+    )
+    p_dockq.add_argument(
+        "--no-align", action="store_true",
+        help="skip sequence alignment (only when model and reference share "
+             "residue numbering; faster)",
+    )
+    p_dockq.add_argument(
+        "--low-memory", action="store_true",
+        help="reduce memory use on very large complexes",
     )
     p_dockq.add_argument(
         "-o", "--out", type=Path, help="write the DockQ table (.tsv/.csv/.json)"
@@ -305,7 +319,7 @@ CONTACT_COLUMNS = [
 ]
 
 DOCKQ_COLUMNS = [
-    "model", "tool", "interface", "native_pair", "dockq", "dockq_class",
+    "model", "tool", "interface", "native_pair", "mapping", "dockq", "dockq_class",
     "fnat", "fnonnat", "f1", "irmsd", "lrmsd", "clashes",
     "len_a", "len_b", "total_dockq",
 ]
@@ -401,6 +415,9 @@ def cmd_dockq(args: argparse.Namespace) -> int:
         return 1
     mapping = None
     if args.mapping:
+        if args.best_mapping:
+            print("error: --mapping and --best-mapping are mutually exclusive", file=sys.stderr)
+            return 2
         try:
             mapping = parse_mapping(args.mapping)
         except ValueError as exc:
@@ -420,6 +437,9 @@ def cmd_dockq(args: argparse.Namespace) -> int:
                 unit.files["structure"], args.ref, mapping,
                 small_molecule=args.small_molecule,
                 capri_peptide=args.capri_peptide,
+                no_align=args.no_align,
+                low_memory=args.low_memory,
+                best_mapping=args.best_mapping,
             )
         except Exception as exc:  # noqa: BLE001 - keep the batch going
             print(f"warning: DockQ failed for {unit.name}: {exc}", file=sys.stderr)
