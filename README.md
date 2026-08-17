@@ -238,12 +238,14 @@ interface table.
   (both directions and d0chn variant), pDockQ, pDockQ2 and LIS all match to
   6 decimal places at the default cutoffs (10/10).
 - Batch-tested on 720+ real predictions across AlphaFold2-Multimer,
-  AlphaFold3 (server + local), Boltz-2, Chai-1 and Protenix — including
-  protein–small-molecule complexes, homodimers, monomers and negative
-  controls — with zero parse errors; known binders score ipSAE 0.9+, decoy
-  pairs < 0.1, monomers report NA.
-- The ColabFold parser is currently validated on synthetic fixtures only;
-  real-output samples welcome (please open an issue).
+  AlphaFold3 (server + local), Boltz-2, Chai-1, ColabFold and Protenix —
+  including protein–small-molecule complexes, homodimers, monomers and
+  negative controls — with zero parse errors; known binders score ipSAE
+  0.9+, decoy pairs < 0.1, monomers report NA.
+- Cross-implementation agreement: on real ColabFold 1.6 output our
+  ipSAE/pDockQ/pDockQ2 reproduce ColabFold's own embedded values to
+  ~1e-5 (bounded only by the 2-decimal PAE rounding in its JSON) — a CI
+  regression test enforces this parity on every commit.
 
 ## 📋 What each metric needs
 
