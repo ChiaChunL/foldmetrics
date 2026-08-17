@@ -40,13 +40,23 @@ def test_contacts_cli(tmp_path, capsys):
     plots = tmp_path / "plots"
     code = main(
         ["contacts", str(directory), "-o", str(out),
-         "--plot", str(plots), "--renderer", "trace"]
+         "--plot", str(plots), "--renderer", "trace", "--no-sessions"]
     )
     assert code == 0
     lines = out.read_text().strip().splitlines()
     assert len(lines) == 1 + (3 * 30 - 2)  # header + contact rows (PAE=5 passes)
     assert "distance" in lines[0]
     assert len(list(plots.glob("*_contacts.png"))) == 1
+
     pml = list(plots.glob("*_contacts.pml"))
     assert len(pml) == 1
-    assert "select if_A" in pml[0].read_text()
+    pml_text = pml[0].read_text()
+    assert "select if_A" in pml_text
+    assert "select hotspots" in pml_text  # labeled closest contacts
+
+    cxc = list(plots.glob("*_contacts.cxc"))
+    assert len(cxc) == 1
+    cxc_text = cxc[0].read_text()
+    assert cxc_text.startswith("#")
+    assert "show cartoons" in cxc_text
+    assert "byhetero" in cxc_text

@@ -1,10 +1,6 @@
-<div align="center">
-<img src="https://raw.githubusercontent.com/ChiaChunL/foldmetrics/main/docs/assets/foldmetrics_banner.svg" alt="foldmetrics" width="78%">
-</div>
-
------------------
-
 # foldmetrics: unified confidence metrics for structure-prediction models
+
+<img src="https://raw.githubusercontent.com/ChiaChunL/foldmetrics/main/docs/assets/foldmetrics_banner.svg" alt="foldmetrics" width="100%">
 
 | Testing | [![CI](https://github.com/ChiaChunL/foldmetrics/actions/workflows/ci.yml/badge.svg)](https://github.com/ChiaChunL/foldmetrics/actions/workflows/ci.yml) |
 |---|---|
@@ -170,11 +166,21 @@ so binding-site contacts are reported too.
 fmx contacts preds/ -o contacts.tsv --plot plots/
 ```
 
-Outputs per model: the contact table (residue pair, distance, both PAE
-directions, pLDDTs), a figure with the interface residues highlighted on
-the structure and overlaid on the PAE heatmap, and a ready-to-run
-`<model>_contacts.pml` with named PyMOL selections (`if_A`, `if_B`,
-`interface`) for interactive inspection.
+Outputs per model with `--plot DIR`:
+
+- the contact table (residue pair, distance, both PAE directions, pLDDTs)
+- `<model>_contacts.png` — interface residues highlighted on the structure
+  and overlaid on the PAE heatmap
+- **viewer sessions with a publication preset applied** (pastel cartoons
+  per chain, interface side chains as sticks, the closest contacts in
+  orange with labels, camera on the interface): `_contacts.pse` opens
+  directly in PyMOL and `_contacts.cxs` in ChimeraX — double-click and the
+  styled scene is there, with named selections (`if_A`, `if_B`,
+  `hotspots`, `interface`) ready in the sidebar. The script forms
+  (`_contacts.pml`, `_contacts.cxc`) are always written; the binary
+  sessions are generated when PyMOL / ChimeraX are installed
+  (auto-detected; `FOLDMETRICS_PYMOL` / `FOLDMETRICS_CHIMERAX` override).
+  Skip session generation with `--no-sessions`.
 
 ![contact map](https://raw.githubusercontent.com/ChiaChunL/foldmetrics/main/docs/assets/demo_contacts.png)
 

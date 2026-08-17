@@ -364,6 +364,15 @@ def contact_highlight(contacts: list[dict]) -> dict[str, list[int]]:
     return {chain: sorted(res) for chain, res in highlight.items()}
 
 
+def contact_hotspots(contacts: list[dict], n_pairs: int = 3) -> dict[str, list[int]]:
+    """Residues of the ``n_pairs`` closest contacts (for labels/highlighting)."""
+    hotspots: dict[str, set[int]] = {}
+    for row in sorted(contacts, key=lambda r: r["distance"])[:n_pairs]:
+        hotspots.setdefault(row["chain_a"], set()).add(row["res_a"])
+        hotspots.setdefault(row["chain_b"], set()).add(row["res_b"])
+    return {chain: sorted(res) for chain, res in hotspots.items()}
+
+
 def _contacts_text(pred: Prediction, contacts: list[dict],
                    dist_cutoff: float, pae_cutoff: float | None) -> str:
     pae_txt = f"PAE < {pae_cutoff:g} Å (both directions)" if pae_cutoff else "no PAE filter"
@@ -396,6 +405,7 @@ def _contacts_text(pred: Prediction, contacts: list[dict],
 def _contact_structure_panel(
     pred: Prediction, fig: plt.Figure, slot: Any, renderer: str,
     highlight: dict[str, list[int]],
+    hotspots: dict[str, list[int]],
 ) -> None:
     color_of = {c: chain_color(i) for i, c in enumerate(pred.chains)}
     image = None
@@ -404,7 +414,10 @@ def _contact_structure_panel(
 
         tmp = Path(tempfile.mkstemp(suffix=".png")[1])
         try:
-            if render_contacts(pred.source, tmp, highlight, color_of) is not None:
+            rendered = render_contacts(
+                pred.source, tmp, pred.chains, highlight, hotspots, color_of
+            )
+            if rendered is not None:
                 image = plt.imread(str(tmp))
         finally:
             try:
@@ -439,6 +452,7 @@ def plot_contact_map(
 ) -> plt.Figure:
     """Confident-contact figure: highlighted structure + PAE with contact overlay."""
     highlight = contact_highlight(contacts)
+    hotspots = contact_hotspots(contacts)
 
     if pred.has_pae:
         fig = plt.figure(figsize=(13.5, 5.6))
@@ -463,7 +477,7 @@ def plot_contact_map(
         ax_text = fig.add_subplot(gs[0, 1])
         structure_slot = gs[0, 0]
 
-    _contact_structure_panel(pred, fig, structure_slot, renderer, highlight)
+    _contact_structure_panel(pred, fig, structure_slot, renderer, highlight, hotspots)
     ax_text.axis("off")
     ax_text.text(
         0.0, 1.0, _contacts_text(pred, contacts, dist_cutoff, pae_cutoff),

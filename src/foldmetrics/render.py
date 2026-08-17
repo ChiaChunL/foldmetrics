@@ -1,12 +1,22 @@
-"""3D structure rendering for figures.
+"""3D structure rendering and viewer-session generation.
 
-Primary renderer: headless PyMOL (auto-detected), producing a ray-traced
-cartoon colored by pLDDT with the AlphaFold confidence colors. When PyMOL
-is unavailable, figures fall back to a matplotlib backbone trace drawn by
-:func:`foldmetrics.viz.plot_structure_trace`.
+Static renders use headless PyMOL (auto-detected) with a matplotlib
+backbone-trace fallback handled in :mod:`foldmetrics.viz`.
 
-PyMOL discovery order: the ``FOLDMETRICS_PYMOL`` environment variable, the
-``pymol`` executable on PATH, then common conda/app install locations.
+For interface contacts a shared "publication preset" is emitted in four
+forms so users can double-click straight into a styled scene:
+
+- ``.pml`` — PyMOL command script (text, always written)
+- ``.pse`` — PyMOL session (written when PyMOL is installed)
+- ``.cxc`` — ChimeraX command script (text, always written)
+- ``.cxs`` — ChimeraX session (written when ChimeraX is installed)
+
+The preset: pastel cartoons per chain, interface residues as sticks in the
+chain's accent color (heteroatoms by element), the closest contact
+residues highlighted in orange and labeled.
+
+Executable discovery: ``FOLDMETRICS_PYMOL`` / ``FOLDMETRICS_CHIMERAX``
+environment variables, then PATH, then common install locations.
 """
 
 from __future__ import annotations
@@ -31,7 +41,350 @@ _PYMOL_GLOBS = (
     "/usr/local/bin/pymol",
 )
 
-# AlphaFold pLDDT confidence colors as PyMOL RGB triples.
+_CHIMERAX_GLOBS = (
+    "/Applications/ChimeraX*.app/Contents/MacOS/ChimeraX",
+    "/Applications/UCSF ChimeraX*.app/Contents/MacOS/ChimeraX",
+    "/usr/bin/chimerax",
+    "/usr/local/bin/chimerax",
+    "/opt/UCSF/ChimeraX*/bin/ChimeraX",
+)
+
+# Cartoon tints (pastel) and accent colors per chain, fixed order.
+PASTEL_CHAIN_COLORS = ["#F2F2F2", "#CBBFE8", "#C4E3D2", "#F6DDBA", "#C2DAEF", "#EFCADD"]
+HOTSPOT_COLOR = "#D55E00"
+
+
+@lru_cache(maxsize=1)
+def find_pymol() -> str | None:
+    """Locate a PyMOL executable, or None if not installed."""
+    env = os.environ.get("FOLDMETRICS_PYMOL")
+    if env:
+        return env if Path(env).exists() else None
+    exe = shutil.which("pymol")
+    if exe:
+        return exe
+    for pattern in _PYMOL_GLOBS:
+        hits = sorted(glob.glob(os.path.expanduser(pattern)))
+        if hits:
+            return hits[0]
+    return None
+
+
+@lru_cache(maxsize=1)
+def find_chimerax() -> str | None:
+    """Locate a ChimeraX executable, or None if not installed."""
+    env = os.environ.get("FOLDMETRICS_CHIMERAX")
+    if env:
+        return env if Path(env).exists() else None
+    for name in ("chimerax", "ChimeraX"):
+        exe = shutil.which(name)
+        if exe:
+            return exe
+    for pattern in _CHIMERAX_GLOBS:
+        hits = sorted(glob.glob(os.path.expanduser(pattern)))
+        if hits:
+            return hits[-1]  # newest version
+    return None
+
+
+def pastel_color(i: int) -> str:
+    return PASTEL_CHAIN_COLORS[i % len(PASTEL_CHAIN_COLORS)]
+
+
+def _resi_ranges(res_ids: list[int], sep: str = "+") -> str:
+    """Compress residue ids: PyMOL ``3+7-10`` (sep '+') or ChimeraX ``3,7-10`` (sep ',')."""
+    ids = sorted(set(res_ids))
+    parts: list[str] = []
+    start = prev = ids[0]
+    for r in ids[1:] + [None]:  # type: ignore[list-item]
+        if r is not None and r == prev + 1:
+            prev = r
+            continue
+        parts.append(str(start) if start == prev else f"{start}-{prev}")
+        if r is not None:
+            start = prev = r
+    return sep.join(parts)
+
+
+def _hex_rgb(color: str) -> list[float]:
+    color = color.lstrip("#")
+    return [round(int(color[i : i + 2], 16) / 255.0, 3) for i in (0, 2, 4)]
+
+
+# ------------------------------------------------------------- PyMOL preset
+def contacts_pymol_commands(
+    structure_path: str | Path,
+    chains: list[str],
+    highlight: dict[str, list[int]],
+    hotspots: dict[str, list[int]],
+    chain_colors: dict[str, str],
+    labels: bool = True,
+) -> list[str]:
+    """Publication-preset PyMOL commands highlighting interface contacts."""
+    lines = [
+        "bg_color white",
+        f"load {structure_path}, model",
+        "hide everything",
+        "show cartoon",
+        "set cartoon_fancy_helices, 1",
+        "set ray_shadows, 0",
+        "set specular, 0.15",
+        "set stick_radius, 0.2",
+        "show sticks, hetatm and not solvent",
+        "util.cnc hetatm and not solvent",
+    ]
+    for i, chain in enumerate(chains):
+        lines.append(f"set_color fm_pastel_{chain}, {_hex_rgb(pastel_color(i))}")
+        lines.append(f"color fm_pastel_{chain}, chain {chain}")
+
+    selections = []
+    for chain, res_ids in highlight.items():
+        if not res_ids:
+            continue
+        name = f"if_{chain}"
+        lines.append(f"set_color fm_accent_{chain}, {_hex_rgb(chain_colors[chain])}")
+        lines.append(f"select {name}, chain {chain} and resi {_resi_ranges(res_ids)}")
+        lines.append(f"show sticks, {name} and (sidechain or hetatm)")
+        lines.append(f"color fm_accent_{chain}, {name}")
+        lines.append(f"util.cnc {name}")
+        selections.append(name)
+
+    hot_parts = [
+        f"(chain {chain} and resi {_resi_ranges(res_ids)})"
+        for chain, res_ids in hotspots.items()
+        if res_ids
+    ]
+    if hot_parts:
+        lines.append(f"select hotspots, {' or '.join(hot_parts)}")
+        lines.append(f"set_color fm_hotspot, {_hex_rgb(HOTSPOT_COLOR)}")
+        lines.append("color fm_hotspot, hotspots and elem C")
+        if labels:
+            lines.append('label hotspots and name CA, one_letter[resn]+resi')
+            lines.append("set label_size, 16")
+            lines.append("set label_color, gray30")
+
+    if selections:
+        lines.append(f"select interface, {' or '.join(selections)}")
+        lines.append("orient interface")
+        lines.append("zoom interface, 8")
+    else:
+        lines.append("orient")
+    lines.append("deselect")
+    lines.append("set ray_opaque_background, 1")
+    lines.append("set antialias, 2")
+    return lines
+
+
+def write_contacts_pml(
+    pml_path: str | Path,
+    structure_path: str | Path,
+    chains: list[str],
+    highlight: dict[str, list[int]],
+    hotspots: dict[str, list[int]],
+    chain_colors: dict[str, str],
+    header: str = "",
+) -> Path:
+    """Write an interactive PyMOL script (double-click / ``@script.pml``)."""
+    pml_path = Path(pml_path)
+    pml_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [f"# {header}"] if header else []
+    lines += contacts_pymol_commands(
+        Path(structure_path).resolve(), chains, highlight, hotspots, chain_colors
+    )
+    pml_path.write_text("\n".join(lines) + "\n")
+    return pml_path
+
+
+def _run_pymol_script(script: str, out_file: Path, timeout: int) -> Path | None:
+    exe = find_pymol()
+    if exe is None:
+        return None
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as fh:
+        fh.write(script)
+        script_path = fh.name
+    try:
+        result = subprocess.run(
+            [exe, "-cq", script_path], capture_output=True, timeout=timeout, check=False
+        )
+        if result.returncode != 0 or not out_file.exists():
+            return None
+        return out_file
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    finally:
+        try:
+            os.unlink(script_path)
+        except OSError:
+            pass
+
+
+def save_contacts_pse(
+    pse_path: str | Path,
+    structure_path: str | Path,
+    chains: list[str],
+    highlight: dict[str, list[int]],
+    hotspots: dict[str, list[int]],
+    chain_colors: dict[str, str],
+    timeout: int = 300,
+) -> Path | None:
+    """PyMOL session with the contact preset applied; None if no PyMOL."""
+    structure_path = Path(structure_path)
+    if not structure_path.exists():
+        return None
+    pse_path = Path(pse_path)
+    commands = contacts_pymol_commands(
+        structure_path.resolve(), chains, highlight, hotspots, chain_colors
+    )
+    script = "from pymol import cmd, util\n" + "\n".join(
+        f"cmd.do({line!r})" for line in commands
+    )
+    script += f"\ncmd.save({str(pse_path)!r})\n"
+    return _run_pymol_script(script, pse_path, timeout)
+
+
+def render_contacts(
+    structure_path: str | Path,
+    out_png: str | Path,
+    chains: list[str],
+    highlight: dict[str, list[int]],
+    hotspots: dict[str, list[int]],
+    chain_colors: dict[str, str],
+    width: int = 1400,
+    height: int = 1150,
+    dpi: int = 300,
+    timeout: int = 300,
+) -> Path | None:
+    """Ray-traced PNG of the contact preset; None if no PyMOL."""
+    structure_path = Path(structure_path)
+    if not structure_path.exists():
+        return None
+    out_png = Path(out_png)
+    commands = contacts_pymol_commands(
+        structure_path.resolve(), chains, highlight, hotspots, chain_colors
+    )
+    script = "from pymol import cmd, util\n" + "\n".join(
+        f"cmd.do({line!r})" for line in commands
+    )
+    script += f"\ncmd.ray({width}, {height})\ncmd.png({str(out_png)!r}, dpi={dpi})\n"
+    return _run_pymol_script(script, out_png, timeout)
+
+
+# ---------------------------------------------------------- ChimeraX preset
+def contacts_cxc_commands(
+    structure_path: str | Path,
+    chains: list[str],
+    highlight: dict[str, list[int]],
+    hotspots: dict[str, list[int]],
+    chain_colors: dict[str, str],
+) -> list[str]:
+    """Publication-preset ChimeraX commands (silhouette style)."""
+    lines = [
+        f"open {structure_path}",
+        "set bgColor white",
+        "hide atoms",
+        "show cartoons",
+        "lighting soft",
+        "graphics silhouettes true",
+        "show ligand atoms",
+        "style ligand stick",
+        "color ligand byhetero",
+    ]
+    for i, chain in enumerate(chains):
+        lines.append(f"color /{chain} {pastel_color(i)} target c")
+
+    interface_specs = []
+    for chain, res_ids in highlight.items():
+        if not res_ids:
+            continue
+        spec = f"/{chain}:{_resi_ranges(res_ids, sep=',')}"
+        lines.append(f"show {spec} atoms")
+        lines.append(f"style {spec} stick")
+        lines.append(f"color {spec} {chain_colors[chain]} target a")
+        lines.append(f"color {spec} byhetero")
+        interface_specs.append(spec)
+
+    hot_specs = [
+        f"/{chain}:{_resi_ranges(res_ids, sep=',')}"
+        for chain, res_ids in hotspots.items()
+        if res_ids
+    ]
+    if hot_specs:
+        hot = "|".join(hot_specs)
+        lines.append(f"color {hot} {HOTSPOT_COLOR} target a")
+        lines.append(f"color {hot} byhetero")
+        lines.append(
+            f'label {hot} residues text "{{0.label_one_letter_code}}{{0.number}}"'
+        )
+    if interface_specs:
+        lines.append(f"view {'|'.join(interface_specs)}")
+    else:
+        lines.append("view")
+    return lines
+
+
+def write_contacts_cxc(
+    cxc_path: str | Path,
+    structure_path: str | Path,
+    chains: list[str],
+    highlight: dict[str, list[int]],
+    hotspots: dict[str, list[int]],
+    chain_colors: dict[str, str],
+    header: str = "",
+) -> Path:
+    """Write an interactive ChimeraX script (open it in ChimeraX to run)."""
+    cxc_path = Path(cxc_path)
+    cxc_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [f"# {header}"] if header else []
+    lines += contacts_cxc_commands(
+        Path(structure_path).resolve(), chains, highlight, hotspots, chain_colors
+    )
+    cxc_path.write_text("\n".join(lines) + "\n")
+    return cxc_path
+
+
+def save_contacts_cxs(
+    cxs_path: str | Path,
+    structure_path: str | Path,
+    chains: list[str],
+    highlight: dict[str, list[int]],
+    hotspots: dict[str, list[int]],
+    chain_colors: dict[str, str],
+    timeout: int = 300,
+) -> Path | None:
+    """ChimeraX session with the contact preset applied; None if no ChimeraX."""
+    exe = find_chimerax()
+    structure_path = Path(structure_path)
+    if exe is None or not structure_path.exists():
+        return None
+    cxs_path = Path(cxs_path)
+    cxs_path.parent.mkdir(parents=True, exist_ok=True)
+
+    commands = contacts_cxc_commands(
+        structure_path.resolve(), chains, highlight, hotspots, chain_colors
+    )
+    commands += [f"save {cxs_path.resolve()} format session", "exit"]
+    with tempfile.NamedTemporaryFile("w", suffix=".cxc", delete=False) as fh:
+        fh.write("\n".join(commands) + "\n")
+        script_path = fh.name
+    try:
+        result = subprocess.run(
+            [exe, "--nogui", "--silent", script_path],
+            capture_output=True, timeout=timeout, check=False,
+        )
+        if result.returncode != 0 or not cxs_path.exists():
+            return None
+        return cxs_path
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    finally:
+        try:
+            os.unlink(script_path)
+        except OSError:
+            pass
+
+
+# ------------------------------------------------------- pLDDT still render
 _PYMOL_SCRIPT = """\
 from pymol import cmd
 
@@ -59,143 +412,6 @@ cmd.png({out!r}, dpi={dpi})
 """
 
 
-@lru_cache(maxsize=1)
-def find_pymol() -> str | None:
-    """Locate a PyMOL executable, or None if not installed."""
-    env = os.environ.get("FOLDMETRICS_PYMOL")
-    if env:
-        return env if Path(env).exists() else None
-    exe = shutil.which("pymol")
-    if exe:
-        return exe
-    for pattern in _PYMOL_GLOBS:
-        hits = sorted(glob.glob(os.path.expanduser(pattern)))
-        if hits:
-            return hits[0]
-    return None
-
-
-def _resi_ranges(res_ids: list[int]) -> str:
-    """Compress residue ids to a PyMOL resi expression: 3+7-10+15."""
-    ids = sorted(set(res_ids))
-    parts: list[str] = []
-    start = prev = ids[0]
-    for r in ids[1:] + [None]:  # type: ignore[list-item]
-        if r is not None and r == prev + 1:
-            prev = r
-            continue
-        parts.append(str(start) if start == prev else f"{start}-{prev}")
-        if r is not None:
-            start = prev = r
-    return "+".join(parts)
-
-
-def _hex_rgb(color: str) -> list[float]:
-    color = color.lstrip("#")
-    return [round(int(color[i : i + 2], 16) / 255.0, 3) for i in (0, 2, 4)]
-
-
-def contacts_pymol_commands(
-    structure_path: str | Path,
-    highlight: dict[str, list[int]],
-    chain_colors: dict[str, str],
-) -> list[str]:
-    """PyMOL command list highlighting interface residues per chain.
-
-    Shared by the headless renderer and the exported ``.pml`` script.
-    """
-    lines = [
-        "bg_color white",
-        f"load {structure_path}, model",
-        "hide everything",
-        "show cartoon",
-        "color gray80",
-        "show sticks, hetatm and not solvent",
-        "set stick_radius, 0.18",
-        "set cartoon_transparency, 0.1",
-    ]
-    selections = []
-    for chain, res_ids in highlight.items():
-        if not res_ids:
-            continue
-        name = f"if_{chain}"
-        color_name = f"fm_{chain}"
-        lines.append(f"set_color {color_name}, {_hex_rgb(chain_colors[chain])}")
-        lines.append(f"select {name}, chain {chain} and resi {_resi_ranges(res_ids)}")
-        lines.append(f"color {color_name}, {name}")
-        lines.append(f"show sticks, {name} and (sidechain or hetatm)")
-        selections.append(name)
-    if selections:
-        lines.append(f"select interface, {' or '.join(selections)}")
-        lines.append("orient interface")
-        lines.append("zoom interface, 6")
-    else:
-        lines.append("orient")
-    lines.append("deselect")
-    lines.append("set ray_opaque_background, 1")
-    lines.append("set antialias, 2")
-    return lines
-
-
-def write_contacts_pml(
-    pml_path: str | Path,
-    structure_path: str | Path,
-    highlight: dict[str, list[int]],
-    chain_colors: dict[str, str],
-    header: str = "",
-) -> Path:
-    """Write an interactive PyMOL script with named interface selections."""
-    pml_path = Path(pml_path)
-    pml_path.parent.mkdir(parents=True, exist_ok=True)
-    lines = [f"# {header}"] if header else []
-    lines += contacts_pymol_commands(Path(structure_path).resolve(), highlight, chain_colors)
-    pml_path.write_text("\n".join(lines) + "\n")
-    return pml_path
-
-
-def render_contacts(
-    structure_path: str | Path,
-    out_png: str | Path,
-    highlight: dict[str, list[int]],
-    chain_colors: dict[str, str],
-    width: int = 1400,
-    height: int = 1150,
-    dpi: int = 300,
-    timeout: int = 300,
-) -> Path | None:
-    """Ray-traced PNG with interface residues highlighted; None if no PyMOL."""
-    exe = find_pymol()
-    structure_path = Path(structure_path)
-    if exe is None or not structure_path.exists():
-        return None
-    out_png = Path(out_png)
-    out_png.parent.mkdir(parents=True, exist_ok=True)
-
-    commands = contacts_pymol_commands(structure_path.resolve(), highlight, chain_colors)
-    script = "from pymol import cmd\n" + "\n".join(
-        f"cmd.do({line!r})" for line in commands
-    )
-    script += f"\ncmd.ray({width}, {height})\ncmd.png({str(out_png)!r}, dpi={dpi})\n"
-    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as fh:
-        fh.write(script)
-        script_path = fh.name
-    try:
-        result = subprocess.run(
-            [exe, "-cq", script_path],
-            capture_output=True, timeout=timeout, check=False,
-        )
-        if result.returncode != 0 or not out_png.exists():
-            return None
-        return out_png
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    finally:
-        try:
-            os.unlink(script_path)
-        except OSError:
-            pass
-
-
 def render_structure(
     structure_path: str | Path,
     out_png: str | Path,
@@ -205,32 +421,12 @@ def render_structure(
     timeout: int = 300,
 ) -> Path | None:
     """Render a pLDDT-colored cartoon PNG with PyMOL; None if unavailable/failed."""
-    exe = find_pymol()
     structure_path = Path(structure_path)
-    if exe is None or not structure_path.exists():
+    if not structure_path.exists():
         return None
     out_png = Path(out_png)
-    out_png.parent.mkdir(parents=True, exist_ok=True)
-
     script = _PYMOL_SCRIPT.format(
         structure=str(structure_path), out=str(out_png),
         width=width, height=height, dpi=dpi,
     )
-    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as fh:
-        fh.write(script)
-        script_path = fh.name
-    try:
-        result = subprocess.run(
-            [exe, "-cq", script_path],
-            capture_output=True, timeout=timeout, check=False,
-        )
-        if result.returncode != 0 or not out_png.exists():
-            return None
-        return out_png
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    finally:
-        try:
-            os.unlink(script_path)
-        except OSError:
-            pass
+    return _run_pymol_script(script, out_png, timeout)

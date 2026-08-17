@@ -142,6 +142,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--renderer", default="auto", choices=["auto", "pymol", "trace"],
         help="structure panel renderer (default: auto)",
     )
+    p_contacts.add_argument(
+        "--no-sessions", action="store_true",
+        help="with --plot: skip generating PyMOL (.pse) and ChimeraX (.cxs) "
+             "session files (the .pml/.cxc scripts are always written)",
+    )
 
     p_dockq = sub.add_parser(
         "dockq",
@@ -360,8 +365,20 @@ def cmd_contacts(args: argparse.Namespace) -> int:
             import matplotlib
 
             matplotlib.use("Agg")
-            from foldmetrics.render import write_contacts_pml
-            from foldmetrics.viz import chain_color, contact_highlight, save_contact_plot
+            from foldmetrics.render import (
+                find_chimerax,
+                find_pymol,
+                save_contacts_cxs,
+                save_contacts_pse,
+                write_contacts_cxc,
+                write_contacts_pml,
+            )
+            from foldmetrics.viz import (
+                chain_color,
+                contact_highlight,
+                contact_hotspots,
+                save_contact_plot,
+            )
 
             args.plot.mkdir(parents=True, exist_ok=True)
             base = _safe_name(pred.name)
@@ -372,18 +389,35 @@ def cmd_contacts(args: argparse.Namespace) -> int:
                 renderer=args.renderer,
             )
             print(f"wrote {target}", file=sys.stderr)
+
+            highlight = contact_highlight(rows)
+            hotspots = contact_hotspots(rows)
             colors = {c: chain_color(i) for i, c in enumerate(pred.chains)}
-            pml = write_contacts_pml(
-                args.plot / f"{base}_contacts.pml",
-                pred.source,
-                contact_highlight(rows),
-                colors,
-                header=(
-                    f"foldmetrics contacts: {pred.name} "
-                    f"(d <= {args.dist_cutoff:g} A, PAE < {pae_cutoff or 'off'})"
-                ),
+            header = (
+                f"foldmetrics contacts: {pred.name} "
+                f"(d <= {args.dist_cutoff:g} A, PAE < {pae_cutoff or 'off'})"
             )
+            preset = (pred.source, pred.chains, highlight, hotspots, colors)
+            pml = write_contacts_pml(args.plot / f"{base}_contacts.pml", *preset,
+                                     header=header)
             print(f"wrote {pml}", file=sys.stderr)
+            cxc = write_contacts_cxc(args.plot / f"{base}_contacts.cxc", *preset,
+                                     header=header)
+            print(f"wrote {cxc}", file=sys.stderr)
+
+            if not args.no_sessions:
+                if find_pymol():
+                    pse = save_contacts_pse(args.plot / f"{base}_contacts.pse", *preset)
+                    print(
+                        f"wrote {pse}" if pse else "note: PyMOL session generation failed",
+                        file=sys.stderr,
+                    )
+                if find_chimerax():
+                    cxs = save_contacts_cxs(args.plot / f"{base}_contacts.cxs", *preset)
+                    print(
+                        f"wrote {cxs}" if cxs else "note: ChimeraX session generation failed",
+                        file=sys.stderr,
+                    )
 
     df = pd.DataFrame(all_rows).reindex(columns=CONTACT_COLUMNS)
     if len(df) == 0:

@@ -56,10 +56,14 @@ fmx contacts examples/data/af3_mpro_ligand --plot plots   # drug binding site
 fmx contacts preds/ --dist-cutoff 6 --pae-cutoff 10       # stricter
 ```
 
-Writes the residue-pair table, a figure (structure highlight + PAE overlay)
-and a `<model>_contacts.pml` PyMOL script with `if_<chain>` / `interface`
-selections. On the barnase–barstar example the closest extracted contacts
-are the literature hotspots (R59/R83/R87/H102 against D35/D39).
+Writes the residue-pair table, a figure (structure highlight + PAE
+overlay), and ready-to-open viewer files with a publication preset
+applied: `_contacts.pse` (PyMOL session) and `_contacts.cxs` (ChimeraX
+session) when those programs are installed, plus the `_contacts.pml` /
+`_contacts.cxc` scripts always. Double-click a session and the styled
+scene (pastel cartoons, interface sticks, labeled hotspot residues) is
+there. On the barnase–barstar example the closest extracted contacts are
+the literature hotspots (R59/R83/R87/H102 against D35/D39).
 
 ## DockQ vs a reference structure
 
