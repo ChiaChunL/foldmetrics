@@ -47,7 +47,8 @@ pip install "foldmetrics[dockq]"
 Development install:
 
 ```bash
-git clone https://github.com/ChiaChunL/foldmetrics.git && cd foldmetrics
+git clone https://github.com/ChiaChunL/foldmetrics.git 
+cd foldmetrics
 pip install -e ".[dev]"
 ```
 

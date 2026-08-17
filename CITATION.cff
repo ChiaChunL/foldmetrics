@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use foldmetrics in your research, please cite it as below."
+title: "foldmetrics: unified confidence metrics and interface contacts for structure-prediction models"
+type: software
+authors:
+  - family-names: "Li"
+    given-names: "Jiajun"
+repository-code: "https://github.com/ChiaChunL/foldmetrics"
+url: "https://github.com/ChiaChunL/foldmetrics"
+license: BSD-3-Clause
+keywords:
+  - structure prediction
+  - AlphaFold
+  - confidence metrics
+  - ipSAE
+  - pDockQ
+  - protein-protein interaction

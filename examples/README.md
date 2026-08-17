@@ -1,7 +1,7 @@
 # Examples
 
 [`data/`](data/) contains **real prediction outputs** (barnase–barstar by
-three tools, plus SARS-CoV-2 Mpro + nirmatrelvir by AlphaFold3) so every
+five tools, plus SARS-CoV-2 Mpro + nirmatrelvir by AlphaFold3) so every
 command below runs as-is from the repository root — no prediction tool
 needed:
 
@@ -10,6 +10,8 @@ examples/data/
 ├── af3_server/       AlphaFold Server download   (cif + summary + full_data)
 ├── af2_multimer/     AlphaFold2-Multimer, JSON layout
 ├── boltz2/           Boltz-2                     (cif + json + npz)
+├── chai1/            Chai-1                      (cif + scores/pae npz)
+├── colabfold/        ColabFold 1.6               (pdb + scores json)
 └── af3_mpro_ligand/  AlphaFold3 local, protein + small-molecule ligand
 ```
 
@@ -25,12 +27,19 @@ Real output (note the chain-naming diversity across tools — handled
 transparently):
 
 ```
-                            model       tool   ptm  iptm  ranking_score  plddt_mean  ipsae  pdockq  pdockq2   lis
-       model_1_multimer_v3_pred_0 alphafold2 0.945 0.937          0.939      98.094  0.897   0.535    0.952 0.787
-                mpro_nirmatrelvir alphafold3 0.950 0.970          0.970      97.527  0.836      NA       NA 0.690
-fold_barnase_barstar_s318_model_0 alphafold3 0.940 0.930          0.930      97.487  0.890   0.528    0.944 0.777
-          barnase_barstar_model_0      boltz 0.965 0.959          0.965      96.702  0.935   0.498    0.939 0.780
+                            model       tool   ptm  iptm  plddt_mean  ipsae  pdockq  pdockq2
+       model_1_multimer_v3_pred_0 alphafold2 0.945 0.937      98.094  0.897   0.535    0.952
+                mpro_nirmatrelvir alphafold3 0.950 0.970      97.527  0.836      NA       NA
+fold_barnase_barstar_s318_model_0 alphafold3 0.940 0.930      97.487  0.890   0.528    0.944
+          barnase_barstar_model_0      boltz 0.965 0.959      96.702  0.935   0.498    0.939
+                      model_idx_0       chai 0.971 0.937      96.532  0.944   0.504    0.942
+      barnase_barstar_rank_001_…   colabfold 0.930 0.920      97.007  0.870   0.462    0.925
 ```
+
+The same complex predicted by five different tools, scored on one scale —
+and on the ColabFold row you can additionally compare our computed
+ipSAE/pDockQ2 against the values ColabFold itself embeds in its JSON
+(preserved in `Prediction.extras` as `colabfold_*`; they agree to ~1e-5).
 
 (`mpro_nirmatrelvir` shows `NA` for pDockQ/pDockQ2 because its only
 interface is protein–ligand; its ipSAE/LIS come from ligand-token scoring.)
