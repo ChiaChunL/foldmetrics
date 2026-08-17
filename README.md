@@ -6,9 +6,8 @@
 
 # foldmetrics: unified confidence metrics for structure-prediction models
 
-| | |
-|---|---|
 | Testing | [![CI](https://github.com/ChiaChunL/foldmetrics/actions/workflows/ci.yml/badge.svg)](https://github.com/ChiaChunL/foldmetrics/actions/workflows/ci.yml) |
+|---|---|
 | Package | [![PyPI Latest Release](https://img.shields.io/pypi/v/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) [![Python versions](https://img.shields.io/pypi/pyversions/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) [![PyPI Downloads](https://img.shields.io/pypi/dm/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) |
 | Meta | [![License - MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) |
 
@@ -99,6 +98,31 @@ contacts = fm.find_contacts(preds[0], dist_cutoff=8.0, pae_cutoff=12.0)
 
 More recipes (including runnable demo data that needs no prediction tool)
 live in [examples/](examples/).
+
+## 🛠️ Command-line reference
+
+In every example above, `preds/` is a **placeholder for wherever your
+prediction outputs live**: a directory (scanned recursively; different
+tools can be mixed freely), one specific model file, or any number of
+paths at once.
+
+| Option | Commands | Meaning |
+|---|---|---|
+| `paths` | all | prediction files and/or directories to process |
+| `--tool NAME` | all | restrict to one tool (`colabfold`, `alphafold2`, `alphafold3`, `boltz`, `chai`, `protenix`); default auto-detects |
+| `-o, --out FILE` | score, metric subcommands, contacts, dockq | write the result table; format follows the extension (`.tsv`/`.csv`/`.json`) |
+| `--interfaces FILE` | score, metric subcommands | also write the per chain-pair table |
+| `--metrics LIST` | score | report only these metrics, e.g. `--metrics ipsae,pdockq2` |
+| `--plot DIR` | score, metric subcommands, contacts | write figures into DIR (contacts also writes a `.pml`) |
+| `--pae-cutoff Å` | score family (default 10, for ipSAE) · contacts (default 12; negative disables) | PAE confidence threshold |
+| `--dist-cutoff Å` | score family, contacts (default 8) | contact-atom distance threshold |
+| `--renderer {auto,pymol,trace}` | score family, plot, contacts | structure panel renderer (PyMOL vs fast trace) |
+| `--format {png,pdf,svg}` / `--dpi N` | plot | figure file format and resolution |
+| `--ref FILE` | dockq | reference structure to compare against (required) |
+| `--mapping A:A,B:D` | dockq | model:reference chain pairing |
+| `--small-molecule` | dockq | also score small-molecule ligand poses |
+
+`fmx <command> --help` prints the complete option list for any command.
 
 ## 🖼️ Visualization
 
@@ -269,21 +293,38 @@ nothing crashes.
 
 ## 📚 References
 
+- Jumper J et al. *Highly accurate protein structure prediction with
+  AlphaFold.* Nature 596, 583–589 (2021).
+  [doi:10.1038/s41586-021-03819-2](https://doi.org/10.1038/s41586-021-03819-2)
+  — pLDDT / PAE and their confidence bands
 - Bryant P, Pozzati G, Elofsson A. *Improved prediction of protein-protein
-  interactions using AlphaFold2.* Nat Commun 13, 1265 (2022). — pDockQ
+  interactions using AlphaFold2.* Nat Commun 13, 1265 (2022).
+  [doi:10.1038/s41467-022-28865-w](https://doi.org/10.1038/s41467-022-28865-w)
+  — pDockQ
 - Zhu W, Shenoy A, Kundrotas P, Elofsson A. *Evaluation of AlphaFold-Multimer
   prediction on multi-chain protein complexes.* Bioinformatics 39, btad424
-  (2023). — pDockQ2
+  (2023).
+  [doi:10.1093/bioinformatics/btad424](https://doi.org/10.1093/bioinformatics/btad424)
+  — pDockQ2
 - Dunbrack RL. *ipSAE: scoring pairwise interactions in AlphaFold models.*
-  bioRxiv 10.1101/2025.02.10.637595 (2025). — ipSAE
+  bioRxiv (2025).
+  [doi:10.1101/2025.02.10.637595](https://doi.org/10.1101/2025.02.10.637595)
+  — ipSAE
 - Kim AR et al. *Enhanced protein-protein interaction discovery via
-  AlphaFold-Multimer.* bioRxiv 10.1101/2024.02.19.580970 (2024). — LIS
+  AlphaFold-Multimer.* bioRxiv (2024).
+  [doi:10.1101/2024.02.19.580970](https://doi.org/10.1101/2024.02.19.580970)
+  — LIS
 - Basu S, Wallner B. *DockQ: A quality measure for protein-protein docking
-  models.* PLoS ONE 11, e0161879 (2016); Mirabello C, Wallner B. *DockQ v2.*
-  Bioinformatics (2024). — DockQ
+  models.* PLoS ONE 11, e0161879 (2016).
+  [doi:10.1371/journal.pone.0161879](https://doi.org/10.1371/journal.pone.0161879);
+  Mirabello C, Wallner B. *DockQ v2.* Bioinformatics (2024).
+  [github.com/bjornwallner/DockQ](https://github.com/bjornwallner/DockQ)
+  — DockQ
 - Zhang J, Pei J, Durham J, Bos T, Cong Q. *Computed cancer interactome
   explains the effects of somatic mutations in cancers.* Protein Sci 31,
-  e4479 (2022). — confident-contact criteria
+  e4479 (2022).
+  [doi:10.1002/pro.4479](https://doi.org/10.1002/pro.4479)
+  — confident-contact criteria
 
 ## 📄 License
 
