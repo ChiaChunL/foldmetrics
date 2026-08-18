@@ -164,3 +164,23 @@ def test_rerun_timestamps_do_not_split_a_target(path, expected):
 )
 def test_chai_trunk_directories_are_run_components(path, expected):
     assert infer_target(path) == expected
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        # a runner may tag the job directory with the seed it holds; the
+        # complex is the same one, so the seeds must aggregate together
+        ("results/af2_multimer/P0__P1_seed2066/unrelaxed_model_1_pred_0.pdb", "P0__P1"),
+        ("results/af2_multimer/P0__P1_seed318/unrelaxed_model_1_pred_0.pdb", "P0__P1"),
+        ("results/chai1/P0__P1_seed2066/pred.model_idx_0.cif", "P0__P1"),
+        ("x/job_run3/m.cif", "job"),
+        # a bare trailing number is ambiguous in a directory and is kept
+        ("af3/P0__P1_2/model.cif", "P0__P1_2"),
+        # job names that merely contain a run word survive
+        ("x/boltz_results_boltz2/model_0.cif", "boltz_results_boltz2"),
+        ("x/barnase_barstar/seed318/m.cif", "barnase_barstar"),
+    ],
+)
+def test_run_tags_on_the_job_directory_are_stripped(path, expected):
+    assert infer_target(path) == expected

@@ -52,12 +52,17 @@ def _is_run_component(name: str) -> bool:
     return saw_word
 
 
-def _strip_run_suffixes(stem: str) -> str:
-    """Drop trailing run descriptors from a file stem: ``job_sample_0`` -> ``job``.
+def _strip_run_suffixes(stem: str, require_word: bool = False) -> str:
+    """Drop trailing run descriptors: ``job_sample_0`` -> ``job``.
 
     A doubled separator marks a field boundary inside job names
     (``P53__MDM2``), so stripping never crosses one: ``model__sample_0``
     keeps both halves even though each is spelled like a run word.
+
+    ``require_word`` refuses to strip a bare trailing number, which is
+    ambiguous in a directory name -- ``P0__P1_2`` is more likely a second
+    complex than run 2 of the first, whereas ``P0__P1_seed2066`` names a
+    run of one complex.
     """
     while True:
         match = re.search(r"([._-]+)([A-Za-z]*)(\d*)$", stem)
@@ -67,6 +72,8 @@ def _strip_run_suffixes(stem: str) -> str:
         if len(separator) > 1:
             return stem
         if not word and not number:
+            return stem
+        if not word and require_word:
             return stem
         if word and word.lower() not in _RUN_WORDS:
             return stem
@@ -81,6 +88,9 @@ def infer_target(source: str | Path) -> str:
     ``ranked``), so that the same complex predicted by different tools —
     and stored in each engine's own output tree — maps to one label.
 
+    A run tag appended to the job directory itself is dropped too, so
+    ``P0__P1_seed2066`` and ``P0__P1_seed318`` are one target.
+
     When every directory is a run descriptor (e.g. scoring straight from a
     ``predictions/`` folder), the file name is used instead:
     ``P0__P1_sample_0.cif`` -> ``P0__P1``.
@@ -88,7 +98,10 @@ def infer_target(source: str | Path) -> str:
     path = Path(source)
     for part in reversed(path.parent.parts):
         if not _is_run_component(part):
-            return _TIMESTAMP_SUFFIX_RE.sub("", part) or part
+            part = _TIMESTAMP_SUFFIX_RE.sub("", part) or part
+            # a runner may tag the job directory with the run it holds
+            # (``P0__P1_seed2066``); that is still the same complex
+            return _strip_run_suffixes(part, require_word=True) or part
 
     stem = _strip_run_suffixes(path.stem)
     return stem or path.parent.name or "unknown"
