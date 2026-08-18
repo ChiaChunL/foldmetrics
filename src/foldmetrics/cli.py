@@ -1,4 +1,5 @@
 """Command-line interface: ``foldmetrics`` (alias ``fmx``)."""
+# PYTHON_ARGCOMPLETE_OK
 
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ METRIC_GROUPS: dict[str, tuple[list[str], list[str]]] = {
     "iptm": (["iptm"], ["iptm_native", "iptm_pae"]),
     "ranking": (["ranking_score"], []),
     "plddt": (["plddt_mean", "iplddt"], ["iplddt"]),
-    "pae": (["pae_mean", "ipae_mean"], ["ipae_mean", "ipae_min"]),
+    "pae": (["pae_mean", "ipae_mean"], ["ipae_mean", "ipae_min", "ipae_max"]),
     "ipsae": (["ipsae"], ["ipsae", "ipsae_ab", "ipsae_ba", "ipsae_d0chn", "ipsae_mode"]),
     "pdockq": (["pdockq"], ["n_contacts", "n_if_res", "pdockq"]),
     "pdockq2": (["pdockq2"], ["pdockq2", "pdockq2_ab", "pdockq2_ba"]),
@@ -88,6 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_score.add_argument(
         "--metrics",
         help="report only these metrics (comma-separated): " + ", ".join(METRIC_GROUPS),
+    )
+    p_score.add_argument(
+        "--by-target", nargs="?", const="", metavar="FILE",
+        help="also print a campaign view aggregated per target and tool "
+             "(mean/std/max over seeds and samples, plus the best model); "
+             "give a FILE to write it as a table too",
     )
 
     for metric in METRIC_GROUPS:
@@ -257,6 +264,17 @@ def cmd_score(args: argparse.Namespace) -> int:
     for pred in predictions:
         for note in pred.warnings:
             print(f"note [{pred.name}]: {note}", file=sys.stderr)
+
+    by_target = getattr(args, "by_target", None)
+    if by_target is not None:
+        from foldmetrics.api import aggregate_by_target
+
+        df_agg = aggregate_by_target(df_full)
+        print()
+        print(df_agg.to_string(index=False, float_format=lambda v: f"{v:.3f}"))
+        if by_target:
+            _write_table(df_agg, Path(by_target))
+            print(f"wrote {by_target}", file=sys.stderr)
 
     if args.out:
         _write_table(df, args.out)
@@ -510,7 +528,14 @@ def cmd_detect(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    try:  # optional shell tab-completion (pip install "foldmetrics[completion]")
+        import argcomplete
+
+        argcomplete.autocomplete(parser)
+    except ImportError:
+        pass
+    args = parser.parse_args(argv)
     if args.command in METRIC_GROUPS:
         args.metrics = args.command
         args.command = "score"

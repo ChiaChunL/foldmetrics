@@ -67,6 +67,9 @@ fmx score examples/data -o metrics.tsv --interfaces interfaces.tsv --plot plots/
 fmx ipsae examples/data
 fmx score examples/data --metrics ipsae,pdockq2,lis
 
+# campaign view: aggregate seeds/samples per target and tool
+fmx score preds/ --by-target summary_by_target.tsv
+
 # confident interface contacts: table + figure + PyMOL/ChimeraX sessions
 fmx contacts examples/data/af3_server -o contacts.tsv --plot plots/
 
@@ -91,6 +94,7 @@ print(df[["model", "tool", "iptm", "ipsae", "pdockq2"]].round(3))
 #              barnase_barstar_model_0      boltz  0.959  0.935    0.939
 
 dfi = fmx.evaluate_interfaces("examples/data")  # one row per chain pair
+agg = fmx.aggregate_by_target(df)  # one row per target+tool over all models
 pred = fmx.load_predictions("examples/data")[0]
 contacts = fmx.find_contacts(pred, dist_cutoff=8.0, pae_cutoff=12.0)
 ```
@@ -111,6 +115,7 @@ once.
 | `-o, --out FILE` | score, metric subcommands, contacts, dockq | write the result table; format follows the extension (`.tsv`/`.csv`/`.json`) |
 | `--interfaces FILE` | score, metric subcommands | also write the per chain-pair table |
 | `--metrics LIST` | score | report only these metrics, e.g. `--metrics ipsae,pdockq2` |
+| `--by-target [FILE]` | score | also print (and optionally write) the per-target/tool aggregate over seeds and samples |
 | `--plot DIR` | score, metric subcommands, contacts | write figures into DIR (contacts also writes a `.pml`) |
 | `--pae-cutoff Å` | score family (default 10, for ipSAE) · contacts (default 12; negative disables) | PAE confidence threshold |
 | `--dist-cutoff Å` | score family, contacts (default 8) | contact-atom distance threshold |
@@ -123,6 +128,25 @@ once.
 | `--no-align` / `--low-memory` / `--capri-peptide` | dockq | skip alignment · reduce memory · peptide criteria |
 
 `fmx <command> --help` prints the complete option list for any command.
+Shell tab-completion is available via `pip install "foldmetrics[completion]"`
+followed by `activate-global-python-argcomplete`.
+
+### Screening many seeds and samples
+
+Large campaigns produce many models per complex. `--by-target` collapses
+them into one row per target and tool — model count, mean/std/max ipTM
+and ipSAE, best pDockQ2, and the name of the best model (by
+ranking_score, else ipSAE, else ipTM):
+
+```
+         target       tool  n_models                         best_model  iptm_mean  iptm_std  ipsae_mean  ipsae_max
+barnase_barstar alphafold3        16 barnase_barstar_seed-1030_sample-2      0.930     0.000       0.888      0.893
+```
+
+The standard deviations show how stable the prediction is across seeds —
+a low mean with high spread is a very different situation from a
+consistently low one. The same table is available in Python as
+`fmx.aggregate_by_target(df)`.
 
 ## 🖼️ Visualization
 

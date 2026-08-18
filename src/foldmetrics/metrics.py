@@ -293,9 +293,11 @@ def pair_metrics(
         )
         row["ipae_mean"] = float(blocks.mean())
         row["ipae_min"] = float(blocks.min())
+        row["ipae_max"] = float(blocks.max())
     else:
         row["ipae_mean"] = float("nan")
         row["ipae_min"] = float("nan")
+        row["ipae_max"] = float("nan")
 
     iptm_native = pred.get_pair_iptm(chain_a, chain_b)
     row["iptm_native"] = iptm_native if iptm_native is not None else float("nan")

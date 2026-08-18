@@ -8,6 +8,7 @@ LIS for single models or whole batches.
 __version__ = "0.1.2"
 
 from foldmetrics.api import (
+    aggregate_by_target,
     evaluate,
     evaluate_full,
     evaluate_interfaces,
@@ -25,6 +26,7 @@ __all__ = [
     "__version__",
     "Prediction",
     "Token",
+    "aggregate_by_target",
     "compute_all",
     "compute_interfaces",
     "compute_summary",

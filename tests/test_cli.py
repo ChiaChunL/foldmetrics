@@ -72,7 +72,50 @@ def test_score_metrics_filter(tmp_path, capsys):
     assert main(["score", str(directory), "--metrics", "nope"]) == 2
 
 
+def test_score_by_target(tmp_path, capsys):
+    from conftest import write_boltz_dir
+
+    write_colabfold_dir(tmp_path / "complex1" / "cf")
+    write_boltz_dir(tmp_path / "complex2" / "boltz")
+    out = tmp_path / "agg.tsv"
+    code = main(["score", str(tmp_path), "--by-target", str(out)])
+    assert code == 0
+    text = capsys.readouterr().out
+    assert "n_models" in text and "best_model" in text
+    lines = out.read_text().strip().splitlines()
+    assert len(lines) == 3  # header + two (target, tool) groups
+    assert "ipsae_mean" in lines[0]
+
+
+def test_aggregate_by_target_api(tmp_path):
+    from foldmetrics.api import aggregate_by_target, evaluate
+
+    write_colabfold_dir(tmp_path / "t1" / "cf")
+    df = evaluate(tmp_path)
+    agg = aggregate_by_target(df)
+    assert len(agg) == 1
+    row = agg.iloc[0]
+    assert row["n_models"] == 1
+    assert row["best_model"] == df.iloc[0]["model"]
+    assert row["iptm_max"] == df.iloc[0]["iptm"]
+
+
 def test_score_empty_dir_errors(tmp_path):
     empty = tmp_path / "empty"
     empty.mkdir()
     assert main(["score", str(empty)]) == 1
+
+
+def test_score_by_target_aggregation(tmp_path, capsys):
+    from conftest import write_boltz_dir
+
+    write_colabfold_dir(tmp_path / "targetA" / "cf")
+    write_boltz_dir(tmp_path / "targetA" / "boltz")
+    out = tmp_path / "by_target.tsv"
+    assert main(["score", str(tmp_path), "--by-target", str(out)]) == 0
+
+    printed = capsys.readouterr().out
+    assert "n_models" in printed and "best_model" in printed
+    header, *rows = out.read_text().strip().splitlines()
+    assert "ipsae_mean" in header and "ipsae_std" in header
+    assert len(rows) == 2  # one row per (target, tool)

@@ -29,7 +29,7 @@ INTERFACE_COLUMNS = [
     "n_contacts", "n_if_res", "iplddt", "pdockq",
     "pdockq2", "pdockq2_ab", "pdockq2_ba",
     "ipsae", "ipsae_ab", "ipsae_ba", "ipsae_d0chn", "iptm_pae",
-    "lis", "iptm_native", "ipae_mean", "ipae_min", "ipsae_mode",
+    "lis", "iptm_native", "ipae_mean", "ipae_min", "ipae_max", "ipsae_mode",
 ]
 
 
@@ -95,3 +95,47 @@ def evaluate_interfaces(
 ) -> pd.DataFrame:
     """One row of metrics per chain pair per model."""
     return evaluate_full(source, tool, pae_cutoff, dist_cutoff, on_error)[1]
+
+
+AGGREGATE_COLUMNS = [
+    "target", "tool", "n_models", "best_model",
+    "iptm_mean", "iptm_std", "iptm_max",
+    "ipsae_mean", "ipsae_std", "ipsae_max",
+    "pdockq2_max", "plddt_mean",
+]
+
+
+def aggregate_by_target(df: pd.DataFrame) -> pd.DataFrame:
+    """Campaign/ensemble view: one row per (target, tool) over all its models.
+
+    Collapses a summary DataFrame (multiple seeds/samples of the same
+    complex) into mean/std/max statistics plus the best model per group,
+    ranked by ranking_score (falling back to ipSAE, then ipTM).
+    """
+    rows = []
+    for (target, tool), group in df.groupby(["target", "tool"], dropna=False):
+        order = (
+            group[["ranking_score", "ipsae", "iptm"]]
+            .bfill(axis=1).iloc[:, 0].fillna(0.0)
+        )
+        rows.append(
+            {
+                "target": target,
+                "tool": tool,
+                "n_models": len(group),
+                "best_model": group.loc[order.idxmax(), "model"],
+                "iptm_mean": group["iptm"].mean(),
+                "iptm_std": group["iptm"].std(),
+                "iptm_max": group["iptm"].max(),
+                "ipsae_mean": group["ipsae"].mean(),
+                "ipsae_std": group["ipsae"].std(),
+                "ipsae_max": group["ipsae"].max(),
+                "pdockq2_max": group["pdockq2"].max(),
+                "plddt_mean": group["plddt_mean"].mean(),
+            }
+        )
+    return (
+        pd.DataFrame(rows, columns=AGGREGATE_COLUMNS)
+        .sort_values(["target", "tool"])
+        .reset_index(drop=True)
+    )
