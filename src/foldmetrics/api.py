@@ -57,6 +57,7 @@ def evaluate_full(
     pae_cutoff: float = DEFAULT_PAE_CUTOFF,
     dist_cutoff: float = DEFAULT_DIST_CUTOFF,
     on_error: str = "raise",
+    pdockq2_variant: str = "consensus",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Summary and per-interface DataFrames for the given predictions.
 
@@ -66,7 +67,9 @@ def evaluate_full(
     summaries = []
     interface_rows: list[dict] = []
     for pred in _as_predictions(source, tool, on_error):
-        summary, interfaces = compute_all(pred, pae_cutoff, dist_cutoff)
+        summary, interfaces = compute_all(
+            pred, pae_cutoff, dist_cutoff, pdockq2_variant
+        )
         summaries.append(summary)
         interface_rows.extend(interfaces)
 
@@ -81,9 +84,12 @@ def evaluate(
     pae_cutoff: float = DEFAULT_PAE_CUTOFF,
     dist_cutoff: float = DEFAULT_DIST_CUTOFF,
     on_error: str = "raise",
+    pdockq2_variant: str = "consensus",
 ) -> pd.DataFrame:
     """One row of metrics per model."""
-    return evaluate_full(source, tool, pae_cutoff, dist_cutoff, on_error)[0]
+    return evaluate_full(
+        source, tool, pae_cutoff, dist_cutoff, on_error, pdockq2_variant
+    )[0]
 
 
 def evaluate_interfaces(
@@ -92,9 +98,12 @@ def evaluate_interfaces(
     pae_cutoff: float = DEFAULT_PAE_CUTOFF,
     dist_cutoff: float = DEFAULT_DIST_CUTOFF,
     on_error: str = "raise",
+    pdockq2_variant: str = "consensus",
 ) -> pd.DataFrame:
     """One row of metrics per chain pair per model."""
-    return evaluate_full(source, tool, pae_cutoff, dist_cutoff, on_error)[1]
+    return evaluate_full(
+        source, tool, pae_cutoff, dist_cutoff, on_error, pdockq2_variant
+    )[1]
 
 
 AGGREGATE_COLUMNS = [

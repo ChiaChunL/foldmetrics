@@ -235,6 +235,26 @@ complexes), `--capri-peptide` (protein–peptide criteria).
 | LIS | higher is better; the authors propose ≈ 0.2 as the interaction cutoff | Kim 2024 |
 | DockQ | < 0.23 incorrect; 0.23–0.49 acceptable; 0.49–0.80 medium; ≥ 0.80 high | Basu & Wallner 2016 (CAPRI classes) |
 
+### pDockQ2 has two established readings
+
+Zhu 2023 fixes pDockQ2's fitted sigmoid and its PAE term, but not which
+atom defines a contact, which atom's pLDDT to read, or whether the partner
+chain contributes to the pLDDT average. Implementations diverge:
+
+| | contact atom | pLDDT | interface residues |
+|---|---|---|---|
+| Dunbrack `ipsae.py`, ColabFold — **our default** | CB (CA for Gly) | that residue's CB | union of both chains, counted once |
+| the paper's own `pdockq2.py` (`variant="zhu2023"`) | CA | that residue's CA | scored chain only, weighted by contacts |
+
+The gap is ~0.005 on real AlphaFold3 output, because CA and CB contacts
+describe different interfaces (33 vs 53 pairs on barnase–barstar). It only
+matters for engines with **per-atom** pLDDT: pDockQ2 was fitted on
+AlphaFold2, where pLDDT is constant within a residue and all readings
+coincide. Pass `variant=` to `foldmetrics.metrics.pdockq2_asym` to choose;
+`pdockq2_ab`/`pdockq2_ba` are the per-chain values the paper defines, and
+the aggregate `pdockq2` is their maximum, which is our convention — the
+paper defines no interface-level aggregate.
+
 Single scores can mislead — pDockQ ignores PAE and can stay deceptively
 high on confidently-folded but wrongly-docked chains, which pDockQ2/ipSAE
 expose. Read them together (that is rather the point of this package).

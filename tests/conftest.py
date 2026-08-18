@@ -95,7 +95,13 @@ def add_protein_chain(
     origin: tuple[float, float, float] = (0.0, 0.0, 0.0),
     plddt: float = 80.0,
     spacing: float = 4.0,
+    cb_plddt: float | None = None,
 ) -> None:
+    """``cb_plddt`` gives CB a different pLDDT from the backbone.
+
+    Engines newer than AlphaFold2 emit per-atom pLDDT; the metrics that
+    read a specific atom can only be pinned down with such a model.
+    """
     chain = gemmi.Chain(name)
     x0, y0, z0 = origin
     for i in range(n_res):
@@ -109,7 +115,7 @@ def add_protein_chain(
         res.add_atom(_atom("CA", "C", (x, y0 + 1.5, z0), plddt))
         res.add_atom(_atom("C", "C", (x + 1.3, y0 + 2.0, z0), plddt))
         res.add_atom(_atom("O", "O", (x + 1.4, y0 + 3.2, z0), plddt))
-        res.add_atom(_atom("CB", "C", (x, y0, z0), plddt))
+        res.add_atom(_atom("CB", "C", (x, y0, z0), plddt if cb_plddt is None else cb_plddt))
         chain.add_residue(res)
     model.add_chain(chain)
 
@@ -179,11 +185,19 @@ def write_colabfold_dir(
     return directory
 
 
-def write_af3_dir(directory: Path, n_a: int = 20, n_b: int = 15, n_lig: int = 3) -> Path:
+def write_af3_dir(
+    directory: Path,
+    n_a: int = 20,
+    n_b: int = 15,
+    n_lig: int = 3,
+    cb_plddt: float | None = None,
+) -> Path:
+    """AlphaFold3 layout. ``cb_plddt`` makes the pLDDT vary within a residue,
+    which only this parser preserves (it reads B-factors, not an npz)."""
     directory.mkdir(parents=True, exist_ok=True)
     st, model = new_structure()
-    add_protein_chain(model, "A", n_a, origin=(0.0, 0.0, 0.0))
-    add_protein_chain(model, "B", n_b, origin=(0.0, 5.0, 0.0))
+    add_protein_chain(model, "A", n_a, origin=(0.0, 0.0, 0.0), cb_plddt=cb_plddt)
+    add_protein_chain(model, "B", n_b, origin=(0.0, 5.0, 0.0), cb_plddt=cb_plddt)
     add_ligand_chain(model, "C", n_lig, origin=(0.0, 60.0, 0.0))
     finish_structure(st, model, directory / "model.cif")
 
@@ -255,7 +269,9 @@ def write_af2_json_dir(directory: Path, n_a: int = 20, n_b: int = 20) -> Path:
     return directory
 
 
-def write_boltz_dir(directory: Path, n_a: int = 25, n_b: int = 20) -> Path:
+def write_boltz_dir(
+    directory: Path, n_a: int = 25, n_b: int = 20, affinity: bool = False
+) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     st, model = new_structure()
     add_protein_chain(model, "A", n_a, origin=(0.0, 0.0, 0.0), plddt=0.0)
@@ -274,4 +290,13 @@ def write_boltz_dir(directory: Path, n_a: int = 25, n_b: int = 20) -> Path:
     (directory / "confidence_job_model_0.json").write_text(json.dumps(confidence))
     np.savez(directory / "pae_job_model_0.npz", pae=np.full((n, n), 6.0))
     np.savez(directory / "plddt_job_model_0.npz", plddt=np.full(n, 0.83))
+    if affinity:  # Boltz-2 affinity mode: one file per job
+        (directory / "affinity_job.json").write_text(
+            json.dumps(
+                {
+                    "affinity_pred_value": -1.23,
+                    "affinity_probability_binary": 0.87,
+                }
+            )
+        )
     return directory

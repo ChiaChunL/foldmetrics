@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+import pytest
 from conftest import make_two_chain_pred
 
 from foldmetrics.metrics import (
@@ -137,3 +138,51 @@ def test_pae_shape_mismatch_disables_pae():
     summary, _ = compute_all(pred)
     assert math.isnan(summary["ipsae"])
     assert not math.isnan(summary["pdockq"])  # contact-based metrics still work
+
+
+# ------------------------------------------- pDockQ2: which atom's pLDDT?
+def _per_atom_plddt_pred(tmp_path):
+    """A two-chain model whose CB pLDDT differs from its backbone pLDDT."""
+    from conftest import add_protein_chain, finish_structure, new_structure
+
+    import foldmetrics as fmx
+
+    st, model = new_structure()
+    add_protein_chain(model, "A", 20, origin=(0.0, 0.0, 0.0), plddt=90.0, cb_plddt=60.0)
+    add_protein_chain(model, "B", 20, origin=(0.0, 5.0, 0.0), plddt=90.0, cb_plddt=60.0)
+    path = tmp_path / "per_atom.pdb"
+    finish_structure(st, model, path)
+
+    from foldmetrics.parsers.structure import tokenize_structure
+
+    tokens = tokenize_structure(path)
+    n = len(tokens)
+    return fmx.Prediction(
+        name="per_atom", tool="test", source=path, tokens=tokens,
+        pae=np.full((n, n), 5.0),
+    )
+
+
+def test_pdockq2_reads_cb_by_default_and_ca_for_zhu2023(tmp_path):
+    pred = _per_atom_plddt_pred(tmp_path)
+    assert pred.plddt_arr[0] == 90.0  # CA
+    assert pred.cb_plddt_arr[0] == 60.0  # CB
+
+    consensus = pdockq2_asym(pred, "A", "B")
+    zhu = pdockq2_asym(pred, "A", "B", variant="zhu2023")
+
+    def expected(mean_plddt):
+        mean_ptm = 1.0 / (1.0 + (5.0 / 10.0) ** 2)
+        return 1.31 / (1 + math.exp(-0.075 * (mean_plddt * mean_ptm - 84.733))) + 0.005
+
+    # the default reads the CB pLDDT (ipsae.py / ColabFold convention)
+    assert math.isclose(consensus, expected(60.0), rel_tol=1e-12)
+    # the paper's own script reads the CA pLDDT of the scored chain
+    assert math.isclose(zhu, expected(90.0), rel_tol=1e-12)
+    assert consensus < zhu
+
+
+def test_pdockq2_rejects_an_unknown_variant():
+    pred = make_two_chain_pred(pae=5.0)
+    with pytest.raises(ValueError, match="unknown pDockQ2 variant"):
+        pdockq2_asym(pred, "A", "B", variant="nope")

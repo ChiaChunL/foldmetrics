@@ -6,6 +6,7 @@ Recognizes, inside a predictions directory::
     confidence_<name>_model_N.json
     pae_<name>_model_N.npz          (optional)
     plddt_<name>_model_N.npz        (optional)
+    affinity_<name>.json            (optional, Boltz-2 affinity mode)
 """
 
 from __future__ import annotations
@@ -73,6 +74,8 @@ class BoltzParser(ToolParser):
             for role, candidate in (
                 ("pae", f"pae_{base}_model_{idx}.npz"),
                 ("plddt", f"plddt_{base}_model_{idx}.npz"),
+                # Boltz-2 affinity mode writes one file per job, not per model
+                ("affinity", f"affinity_{base}.json"),
             ):
                 if candidate in names:
                     files[role] = directory / candidate
@@ -121,6 +124,15 @@ class BoltzParser(ToolParser):
                 chains.append(t.chain)
 
         extras = {k: data[k] for k in _EXTRA_KEYS if k in data}
+        if "affinity" in unit.files:
+            try:
+                affinity = load_json(unit.files["affinity"])
+            except Exception as exc:  # noqa: BLE001 - never fail on an extra
+                warnings.append(f"could not read the affinity JSON: {exc}")
+            else:
+                extras.update(
+                    {f"boltz_{k}": v for k, v in affinity.items()}
+                )
         return Prediction(
             name=unit.name,
             tool=self.tool,

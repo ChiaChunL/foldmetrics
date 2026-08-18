@@ -40,9 +40,18 @@ class ChaiParser(ToolParser):
             if structure is None:
                 continue
             files = {"scores": directory / fn, "structure": directory / structure}
-            for pae_file in (f"pae.model_idx_{idx}.npz", f"pae_model_idx_{idx}.npz"):
+            stacked_index: int | None = None
+            # per-model file first; recent runs write one stacked pae.npz
+            # shaped (n_models, n_tokens, n_tokens) for the whole job
+            for pae_file in (
+                f"pae.model_idx_{idx}.npz",
+                f"pae_model_idx_{idx}.npz",
+                "pae.npz",
+            ):
                 if pae_file in names:
                     files["pae"] = directory / pae_file
+                    if pae_file == "pae.npz":
+                        stacked_index = int(idx)
                     break
             units.append(
                 Unit(
@@ -50,6 +59,7 @@ class ChaiParser(ToolParser):
                     name=f"model_idx_{idx}",
                     dir=directory,
                     files=files,
+                    meta={"pae_index": stacked_index},
                 )
             )
         return units
@@ -85,11 +95,23 @@ class ChaiParser(ToolParser):
         if pae is None and "pae" in unit.files:
             with np.load(unit.files["pae"]) as npz:
                 key = "pae" if "pae" in npz.files else npz.files[0]
-                pae = np.squeeze(np.asarray(npz[key], dtype=float))
+                pae = np.asarray(npz[key], dtype=float)
                 if "plddt" in npz.files:
                     plddt = np.squeeze(np.asarray(npz["plddt"], dtype=float))
-        if pae is not None and pae.ndim == 3:
-            pae = pae[0]
+            index = unit.meta.get("pae_index")
+            if pae.ndim == 3:
+                # a stacked file is indexed by model, a per-model file is not
+                pick = int(index) if index is not None else 0
+                if pick >= pae.shape[0]:
+                    warnings.append(
+                        f"pae npz holds {pae.shape[0]} matrices but this is "
+                        f"model {pick}; PAE-based metrics unavailable"
+                    )
+                    pae = None
+                else:
+                    pae = pae[pick]
+            else:
+                pae = np.squeeze(pae)
         if pae is None:
             warnings.append(
                 "no PAE found in Chai output (rerun with PAE export enabled); "

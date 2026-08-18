@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from conftest import write_colabfold_dir
 
 from foldmetrics.cli import main
@@ -119,3 +120,32 @@ def test_score_by_target_aggregation(tmp_path, capsys):
     header, *rows = out.read_text().strip().splitlines()
     assert "ipsae_mean" in header and "ipsae_std" in header
     assert len(rows) == 2  # one row per (target, tool)
+
+
+def test_pdockq2_variant_flag_changes_only_that_column(tmp_path, capsys):
+    """The flag must reach the table, and leave the other metrics alone.
+
+    Needs a model with per-atom pLDDT: with a uniform one the two readings
+    coincide by construction.
+    """
+    import pandas as pd
+    from conftest import write_af3_dir
+
+    directory = write_af3_dir(tmp_path / "af3", cb_plddt=55.0)
+    out_a, out_b = tmp_path / "a.tsv", tmp_path / "b.tsv"
+    assert main(["score", str(directory), "-o", str(out_a)]) == 0
+    assert main(
+        ["score", str(directory), "-o", str(out_b), "--pdockq2-variant", "zhu2023"]
+    ) == 0
+
+    a = pd.read_csv(out_a, sep="\t")
+    b = pd.read_csv(out_b, sep="\t")
+    for column in ("ptm", "iptm", "ipsae", "pdockq", "lis", "plddt_mean"):
+        assert a[column].equals(b[column]), column
+    assert not a["pdockq2"].equals(b["pdockq2"])
+
+
+def test_pdockq2_variant_flag_rejects_unknown_values(tmp_path):
+    directory = write_colabfold_dir(tmp_path / "cf")  # any input will do
+    with pytest.raises(SystemExit):
+        main(["score", str(directory), "--pdockq2-variant", "nope"])

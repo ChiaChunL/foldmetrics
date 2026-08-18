@@ -60,6 +60,25 @@ def _units_in_dir(directory: Path, parsers: list[ToolParser]) -> list[Unit]:
     return units
 
 
+def _drop_duplicated_summary_models(units: list[Unit]) -> list[Unit]:
+    """Remove models an engine writes twice under one job directory.
+
+    AlphaFold3 copies its best-ranked sample to ``<job>_model.cif`` in the
+    job directory while the sample itself also lives in
+    ``seed-<S>_sample-<N>/`` below it (verified by identical coordinates).
+    Counting both would inflate every per-target aggregate, so the copy is
+    dropped whenever the samples it summarises were found as well.
+    """
+    sample_parents = {
+        unit.dir.parent for unit in units if unit.tool == "alphafold3"
+    }
+    return [
+        unit
+        for unit in units
+        if not (unit.tool == "alphafold3" and unit.dir in sample_parents)
+    ]
+
+
 def discover(
     paths: Iterable[str | Path] | str | Path, tool: str = "auto"
 ) -> list[Unit]:
@@ -92,6 +111,7 @@ def discover(
         else:
             raise FileNotFoundError(f"path does not exist: {path}")
 
+    units = _drop_duplicated_summary_models(units)
     return sorted(units, key=lambda u: (str(u.dir), u.tool, u.name))
 
 

@@ -150,3 +150,17 @@ def test_colabfold_per_job_directories_still_work(tmp_path):
 )
 def test_rerun_timestamps_do_not_split_a_target(path, expected):
     assert infer_target(path) == expected
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        # Chai-1 adds trunk_<N>/ when several trunk samples are requested
+        ("chai/P0__P1/trunk_0/pred.model_idx_0.cif", "P0__P1"),
+        ("chai/P0__P2/trunk_1/pred.model_idx_0.cif", "P0__P2"),
+        # a single trunk sample writes straight into the job directory
+        ("chai/P0__P1/pred.model_idx_0.cif", "P0__P1"),
+    ],
+)
+def test_chai_trunk_directories_are_run_components(path, expected):
+    assert infer_target(path) == expected

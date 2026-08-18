@@ -131,3 +131,74 @@ def test_discover_mixed_batch(tmp_path):
 def test_discover_missing_path_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         discover(tmp_path / "does_not_exist")
+
+
+def test_boltz_affinity_is_preserved(tmp_path):
+    """Boltz-2 affinity mode writes one affinity JSON per job."""
+    from conftest import write_boltz_dir
+
+    directory = write_boltz_dir(tmp_path / "boltz", affinity=True)
+    pred = get_parser("boltz").load(discover(directory)[0])
+    assert math.isclose(pred.extras["boltz_affinity_pred_value"], -1.23)
+    assert math.isclose(pred.extras["boltz_affinity_probability_binary"], 0.87)
+
+
+def test_boltz_without_affinity_is_unaffected(tmp_path):
+    from conftest import write_boltz_dir
+
+    directory = write_boltz_dir(tmp_path / "boltz")
+    pred = get_parser("boltz").load(discover(directory)[0])
+    assert not any(k.startswith("boltz_affinity") for k in pred.extras)
+    assert not pred.warnings
+
+
+def test_af3_top_level_copy_is_not_counted_twice(tmp_path):
+    """AlphaFold3 duplicates its best sample into the job directory."""
+    from conftest import write_af3_dir
+
+    job = tmp_path / "af3" / "P0__P1"
+    write_af3_dir(job / "seed-2066_sample-0")
+    write_af3_dir(job / "seed-2066_sample-1")
+    write_af3_dir(job)  # the copy AlphaFold3 leaves beside the samples
+
+    units = discover(tmp_path)
+    assert len(units) == 2
+    assert all(u.dir != job for u in units)
+
+
+def test_af3_without_sample_directories_is_kept(tmp_path):
+    """A job that only has the top-level model must still be scored."""
+    from conftest import write_af3_dir
+
+    write_af3_dir(tmp_path / "af3" / "P0__P1")
+    assert len(discover(tmp_path)) == 1
+
+
+def test_chai_stacked_pae_npz_is_indexed_per_model(tmp_path):
+    """Recent Chai-1 writes one pae.npz holding every model's matrix."""
+    import numpy as np
+    from conftest import add_protein_chain, finish_structure, new_structure
+
+    directory = tmp_path / "chai"
+    directory.mkdir(parents=True)
+    n_models, n = 3, 24
+    for idx in range(n_models):
+        st, model = new_structure()
+        add_protein_chain(model, "A", 12, origin=(0.0, 0.0, 0.0))
+        add_protein_chain(model, "B", 12, origin=(0.0, 5.0, 0.0))
+        finish_structure(st, model, directory / f"pred.model_idx_{idx}.cif")
+        np.savez(
+            directory / f"scores.model_idx_{idx}.npz",
+            ptm=np.array([0.9]), iptm=np.array([0.8]),
+            aggregate_score=np.array([0.85]),
+        )
+    # a distinct constant per model so the slice can be identified
+    stacked = np.stack([np.full((n, n), 2.0 + idx) for idx in range(n_models)])
+    np.savez(directory / "pae.npz", pae=stacked)
+
+    for unit in discover(directory):
+        pred = get_parser("chai").load(unit)
+        idx = int(unit.name.rsplit("_", 1)[1])
+        assert pred.has_pae, unit.name
+        assert not pred.warnings
+        assert math.isclose(float(pred.pae[0, 0]), 2.0 + idx)

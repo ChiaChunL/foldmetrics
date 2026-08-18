@@ -52,18 +52,25 @@ def calc_d0_array(n: np.ndarray | float, nucleic: bool = False) -> np.ndarray:
 
 
 def _contact_pairs(
-    pred: Prediction, chain_a: str, chain_b: str, dist_cutoff: float
+    pred: Prediction,
+    chain_a: str,
+    chain_b: str,
+    dist_cutoff: float,
+    use_anchor: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Indices (into pred.tokens) of contact pairs between two chains.
 
-    Contacts are measured between contact atoms (CB / GLY-CA / C3'),
-    polymer tokens only, matching the pDockQ definition.
+    Distances are measured between contact atoms (CB / GLY-CA / C3'), as
+    pDockQ requires (Bryant 2022). ``use_anchor`` switches to the anchor
+    atoms (CA / C1') for pDockQ2, whose reference implementation measures
+    CA-CA. Polymer tokens only, in both cases.
     """
     idx_a = pred.token_idx(chain_a, polymer_only=True)
     idx_b = pred.token_idx(chain_b, polymer_only=True)
     if idx_a.size == 0 or idx_b.size == 0:
         return np.array([], dtype=int), np.array([], dtype=int)
-    diff = pred.coords[idx_a][:, None, :] - pred.coords[idx_b][None, :, :]
+    coords = pred.anchor_coords if use_anchor else pred.coords
+    diff = coords[idx_a][:, None, :] - coords[idx_b][None, :, :]
     dist = np.linalg.norm(diff, axis=-1)
     ii, jj = np.where(dist <= dist_cutoff)
     return idx_a[ii], idx_b[jj]
@@ -96,24 +103,80 @@ def pdockq(
     return PdockqResult(value, n_pairs, int(unique.size), mean_plddt)
 
 
+PDOCKQ2_VARIANTS = ("consensus", "zhu2023")
+
+
 def pdockq2_asym(
     pred: Prediction,
-    chain_aligned: str,
     chain_scored: str,
+    chain_partner: str,
     dist_cutoff: float = DEFAULT_DIST_CUTOFF,
+    variant: str = "consensus",
 ) -> float:
-    """pDockQ2 (Zhu 2023) for one direction (PAE rows from ``chain_aligned``).
+    """pDockQ2 for ``chain_scored`` against ``chain_partner`` (Zhu 2023).
+
+    pDockQ2 is defined **per chain**, not per interface: every
+    implementation, including the paper's own, reports one value per
+    chain. Zhu 2023 fixes the fitted sigmoid
+    (``L=1.31034849, x0=84.7326239, k=0.0747157696, b=0.00501886443``,
+    used verbatim here) and the PAE term -- ``mean(1/(1+(PAE/10)^2))`` over
+    inter-chain contacts -- but it does not state in prose which atom
+    defines a contact, which atom's pLDDT to read, or whether the partner
+    chain's residues enter the pLDDT average. Implementations therefore
+    diverge, and the two established readings are both available here:
+
+    ``variant="consensus"`` (default)
+        Contacts between **CB** atoms (CA for glycine); the pLDDT average
+        runs over the **union** of both chains' interface residues, each
+        counted once, using that residue's CB value. This is what the
+        Dunbrack Lab ``ipsae.py`` and the copy vendored in ColabFold both
+        compute, and foldmetrics reproduces both to ~1e-5 on real output.
+
+    ``variant="zhu2023"``
+        The paper's own script (``src/pdockq2.py`` in
+        ElofssonLab/afm-benchmark): contacts between **CA** atoms (CB only
+        when CA is absent), and the pLDDT average taken over the **scored
+        chain only**, weighted by contact count -- a residue with several
+        contacting partners enters the mean several times -- reading each
+        residue's CA value.
+
+    On real AlphaFold3 output of barnase-barstar the two differ by about
+    0.005 (0.9463 vs 0.9496), because the CA and CB contact sets are not
+    the same interface (53 vs 33 pairs there).
+
+    Which atom's pLDDT is read only matters for engines that emit
+    **per-atom** pLDDT. pDockQ2 was fitted on AlphaFold2, where pLDDT is
+    constant within a residue, so the question could not arise; on
+    AlphaFold3, Chai-1 and Protenix the spread within one residue exceeds
+    30 units, and a heavy-atom mean (a third reading, used by some tools)
+    shifts the score by ~0.013. Boltz-2 is unaffected: its pLDDT is
+    per-residue. Parsers that receive a per-residue pLDDT from the tool
+    itself (Boltz, Chai-1, ColabFold, AlphaFold2) store it on every atom of
+    the residue, so all readings coincide for them.
 
     Returns NaN without a PAE matrix, 0.0 when the chains have no contacts.
     """
+    if variant not in PDOCKQ2_VARIANTS:
+        raise ValueError(
+            f"unknown pDockQ2 variant {variant!r}; choose from {PDOCKQ2_VARIANTS}"
+        )
     if pred.pae is None:
         return float("nan")
-    ia, ib = _contact_pairs(pred, chain_aligned, chain_scored, dist_cutoff)
+
+    zhu = variant == "zhu2023"
+    ia, ib = _contact_pairs(
+        pred, chain_scored, chain_partner, dist_cutoff, use_anchor=zhu
+    )
     if ia.size == 0:
         return 0.0
     mean_ptm = float(np.mean(ptm_transform(pred.pae[ia, ib], 10.0)))
-    unique = np.unique(np.concatenate([ia, ib]))
-    mean_plddt = float(pred.cb_plddt_arr[unique].mean())
+    if zhu:
+        # ia repeats a residue once per contact: the paper's per-contact
+        # weighting over the scored chain only, read at the CA atom
+        mean_plddt = float(pred.plddt_arr[ia].mean())
+    else:
+        unique = np.unique(np.concatenate([ia, ib]))
+        mean_plddt = float(pred.cb_plddt_arr[unique].mean())
     x = mean_plddt * mean_ptm
     return 1.31 / (1.0 + math.exp(-0.075 * (x - 84.733))) + 0.005
 
@@ -216,6 +279,7 @@ def pair_metrics(
     chain_b: str,
     pae_cutoff: float = DEFAULT_PAE_CUTOFF,
     dist_cutoff: float = DEFAULT_DIST_CUTOFF,
+    pdockq2_variant: str = "consensus",
 ) -> dict[str, Any]:
     """All interface metrics for one unordered chain pair."""
     kinds = pred.chain_kinds
@@ -239,8 +303,8 @@ def pair_metrics(
         row["n_if_res"] = pq.n_if_res
         row["iplddt"] = pq.mean_plddt
         row["pdockq"] = pq.value
-        ab = pdockq2_asym(pred, chain_a, chain_b, dist_cutoff)
-        ba = pdockq2_asym(pred, chain_b, chain_a, dist_cutoff)
+        ab = pdockq2_asym(pred, chain_a, chain_b, dist_cutoff, pdockq2_variant)
+        ba = pdockq2_asym(pred, chain_b, chain_a, dist_cutoff, pdockq2_variant)
         row["pdockq2_ab"], row["pdockq2_ba"] = ab, ba
         row["pdockq2"] = _nan_stat([ab, ba], max)
     else:
@@ -308,10 +372,11 @@ def compute_interfaces(
     pred: Prediction,
     pae_cutoff: float = DEFAULT_PAE_CUTOFF,
     dist_cutoff: float = DEFAULT_DIST_CUTOFF,
+    pdockq2_variant: str = "consensus",
 ) -> list[dict[str, Any]]:
     """Interface metrics for every unordered chain pair."""
     return [
-        pair_metrics(pred, a, b, pae_cutoff, dist_cutoff)
+        pair_metrics(pred, a, b, pae_cutoff, dist_cutoff, pdockq2_variant)
         for a, b in combinations(pred.chains, 2)
     ]
 
@@ -321,6 +386,7 @@ def compute_summary(
     pae_cutoff: float = DEFAULT_PAE_CUTOFF,
     dist_cutoff: float = DEFAULT_DIST_CUTOFF,
     interfaces: list[dict[str, Any]] | None = None,
+    pdockq2_variant: str = "consensus",
 ) -> dict[str, Any]:
     """One summary row per model.
 
@@ -329,7 +395,7 @@ def compute_summary(
     :func:`compute_interfaces` for the per-pair breakdown.
     """
     if interfaces is None:
-        interfaces = compute_interfaces(pred, pae_cutoff, dist_cutoff)
+        interfaces = compute_interfaces(pred, pae_cutoff, dist_cutoff, pdockq2_variant)
 
     summary: dict[str, Any] = {
         "model": pred.name,
@@ -456,10 +522,14 @@ def compute_all(
     pred: Prediction,
     pae_cutoff: float = DEFAULT_PAE_CUTOFF,
     dist_cutoff: float = DEFAULT_DIST_CUTOFF,
+    pdockq2_variant: str = "consensus",
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Summary row plus per-interface rows for one prediction."""
-    interfaces = compute_interfaces(pred, pae_cutoff, dist_cutoff)
-    summary = compute_summary(pred, pae_cutoff, dist_cutoff, interfaces=interfaces)
+    interfaces = compute_interfaces(pred, pae_cutoff, dist_cutoff, pdockq2_variant)
+    summary = compute_summary(
+        pred, pae_cutoff, dist_cutoff, interfaces=interfaces,
+        pdockq2_variant=pdockq2_variant,
+    )
     for row in interfaces:
         row["model"] = pred.name
         row["tool"] = pred.tool

@@ -70,6 +70,7 @@ def tokenize_structure(path: str | Path) -> list[Token]:
                         kind="protein",
                         atom_name=cb.name,
                         xyz=_xyz(cb),
+                        anchor_xyz=_xyz(ca),
                         plddt=ca.b_iso,
                         cb_plddt=cb.b_iso,
                     )
@@ -86,6 +87,7 @@ def tokenize_structure(path: str | Path) -> list[Token]:
                         kind=kind,
                         atom_name=contact.name,
                         xyz=_xyz(contact),
+                        anchor_xyz=_xyz(anchor),
                         plddt=anchor.b_iso,
                         cb_plddt=contact.b_iso,
                     )
@@ -100,6 +102,7 @@ def tokenize_structure(path: str | Path) -> list[Token]:
                             kind="ligand",
                             atom_name=atom.name,
                             xyz=_xyz(atom),
+                            anchor_xyz=_xyz(atom),
                             plddt=atom.b_iso,
                             cb_plddt=atom.b_iso,
                         )

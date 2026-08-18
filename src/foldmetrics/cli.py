@@ -10,7 +10,11 @@ import warnings
 from pathlib import Path
 
 from foldmetrics import __version__
-from foldmetrics.metrics import DEFAULT_DIST_CUTOFF, DEFAULT_PAE_CUTOFF
+from foldmetrics.metrics import (
+    DEFAULT_DIST_CUTOFF,
+    DEFAULT_PAE_CUTOFF,
+    PDOCKQ2_VARIANTS,
+)
 from foldmetrics.parsers import discover, load_predictions, parser_names
 
 # metric name -> (summary columns, interface columns); used by --metrics and
@@ -70,6 +74,12 @@ def _add_score_args(sub: argparse.ArgumentParser) -> None:
         help="structure panel renderer: auto/pymol use headless PyMOL when "
              "available (adds a few seconds per model), trace is a fast "
              "matplotlib backbone trace (default: auto)",
+    )
+    sub.add_argument(
+        "--pdockq2-variant", default="consensus", choices=list(PDOCKQ2_VARIANTS),
+        help="which reading of pDockQ2 to compute: consensus matches the "
+             "Dunbrack ipsae.py and ColabFold implementations (default), "
+             "zhu2023 matches the script published with the paper",
     )
 
 
@@ -234,7 +244,10 @@ def cmd_score(args: argparse.Namespace) -> int:
         return 1
 
     df, df_interfaces = evaluate_full(
-        predictions, pae_cutoff=args.pae_cutoff, dist_cutoff=args.dist_cutoff
+        predictions,
+        pae_cutoff=args.pae_cutoff,
+        dist_cutoff=args.dist_cutoff,
+        pdockq2_variant=args.pdockq2_variant,
     )
     df_full = df  # figures always use every metric, regardless of --metrics
 

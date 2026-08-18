@@ -12,13 +12,15 @@ import numpy as np
 
 # Path components that only describe *which run* a model came from, never
 # which complex it is: engine output trees interleave them freely
-# (``seed_2066/predictions/``, ``seed-1_sample-0/``, ``pred0/``, ``ranked/``).
+# (``seed_2066/predictions/``, ``seed-1_sample-0/``, ``pred0/``, ``ranked/``,
+# ``trunk_0/`` from Chai-1 with several trunk samples).
 _RUN_WORDS = frozenset(
     {
         "seed", "seeds", "sample", "samples", "pred", "preds",
         "prediction", "predictions", "output", "outputs", "outs", "out",
         "result", "results", "rank", "ranked", "ranking",
         "model", "models", "idx", "run", "runs", "fold", "folds",
+        "trunk", "trunks", "diffn", "recycle",
     }
 )
 _TOKEN_RE = re.compile(r"[A-Za-z]+|\d+")
@@ -111,7 +113,9 @@ class Token:
     atom_name: str  # contact atom the coordinates refer to (CB / C3' / the atom itself)
     xyz: tuple[float, float, float]
     plddt: float  # anchor-atom pLDDT (CA / C1' / the atom itself), 0-100 scale
-    cb_plddt: float  # contact-atom pLDDT, used by pDockQ/pDockQ2/ipLDDT
+    cb_plddt: float  # contact-atom pLDDT, used by pDockQ/ipLDDT
+    # anchor atom (CA / C1' / the atom itself); None means "same as xyz"
+    anchor_xyz: tuple[float, float, float] | None = None
 
 
 @dataclass
@@ -173,6 +177,14 @@ class Prediction:
     @cached_property
     def coords(self) -> np.ndarray:
         return np.array([t.xyz for t in self.tokens], dtype=float).reshape(self.n_tokens, 3)
+
+    @cached_property
+    def anchor_coords(self) -> np.ndarray:
+        """CA / C1' positions, falling back to the contact atom."""
+        return np.array(
+            [t.anchor_xyz if t.anchor_xyz is not None else t.xyz for t in self.tokens],
+            dtype=float,
+        ).reshape(self.n_tokens, 3)
 
     @cached_property
     def plddt_arr(self) -> np.ndarray:

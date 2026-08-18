@@ -23,6 +23,8 @@ class Unit:
     name: str
     dir: Path
     files: dict[str, Path] = field(default_factory=dict)
+    # parser-specific hints, e.g. which slice of a stacked npz belongs here
+    meta: dict[str, Any] = field(default_factory=dict)
 
     @property
     def key(self) -> tuple[str, str, str]:
