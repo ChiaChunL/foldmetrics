@@ -10,22 +10,75 @@ from typing import Any
 
 import numpy as np
 
-_STRIP_DIR_RE = re.compile(r"^(seed|sample|pred|rank|ranked|model)[-_]?\d*$", re.IGNORECASE)
+# Path components that only describe *which run* a model came from, never
+# which complex it is: engine output trees interleave them freely
+# (``seed_2066/predictions/``, ``seed-1_sample-0/``, ``pred0/``, ``ranked/``).
+_RUN_WORDS = frozenset(
+    {
+        "seed", "seeds", "sample", "samples", "pred", "preds",
+        "prediction", "predictions", "output", "outputs", "outs", "out",
+        "result", "results", "rank", "ranked", "ranking",
+        "model", "models", "idx", "run", "runs", "fold", "folds",
+    }
+)
+_TOKEN_RE = re.compile(r"[A-Za-z]+|\d+")
+
+
+def _is_run_component(name: str) -> bool:
+    """True when every word in ``name`` is a run descriptor or a number.
+
+    Handles the flat (``seed318``, ``predictions``) and the compound
+    (``seed-1_sample-0``, ``model_idx_0``) spellings alike, while leaving
+    real job names such as ``P0__P1`` or ``boltz_results_boltz2`` alone.
+    """
+    tokens = _TOKEN_RE.findall(name)
+    if not tokens:
+        return False
+    saw_word = False
+    for token in tokens:
+        if token.isdigit():
+            continue
+        if token.lower() in _RUN_WORDS:
+            saw_word = True
+            continue
+        return False
+    return saw_word
+
+
+def _strip_run_suffixes(stem: str) -> str:
+    """Drop trailing run descriptors from a file stem: ``job_sample_0`` -> ``job``."""
+    while True:
+        match = re.search(r"[._-]+([A-Za-z]*)(\d*)$", stem)
+        if match is None:
+            return stem
+        word, number = match.group(1), match.group(2)
+        if not word and not number:
+            return stem
+        if word and word.lower() not in _RUN_WORDS:
+            return stem
+        stem = stem[: match.start()]
 
 
 def infer_target(source: str | Path) -> str:
-    """Best-effort target (job) name from a prediction's directory path.
+    """Best-effort target (job) name for a prediction file.
 
-    Walks up from the structure file's directory, skipping generic run
-    components like ``seed318``, ``pred0``, ``sample-1`` or ``ranked``, so
-    that the same complex predicted by different tools (usually organized
-    as ``<tool>/<target>/<seed...>``) maps to one target label.
+    Walks up from the structure file, skipping directories that only
+    describe the run (``seed_2066``, ``predictions``, ``sample-1``,
+    ``ranked``), so that the same complex predicted by different tools —
+    and stored in each engine's own output tree — maps to one label.
+
+    When every directory is a run descriptor (e.g. scoring straight from a
+    ``predictions/`` folder), the file name is used instead:
+    ``P0__P1_sample_0.cif`` -> ``P0__P1``.
     """
-    parts = Path(source).parent.parts
-    for part in reversed(parts):
-        if not _STRIP_DIR_RE.match(part):
+    path = Path(source)
+    for part in reversed(path.parent.parts):
+        if not _is_run_component(part):
             return part
-    return Path(source).parent.name or "unknown"
+
+    stem = _strip_run_suffixes(path.stem)
+    return stem or path.parent.name or "unknown"
+
 
 POLYMER_KINDS = frozenset({"protein", "dna", "rna"})
 NUCLEIC_KINDS = frozenset({"dna", "rna"})
