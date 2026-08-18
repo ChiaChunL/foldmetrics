@@ -134,3 +134,19 @@ def test_colabfold_per_job_directories_still_work(tmp_path):
     for job in ("A__B", "A__C"):
         write_colabfold_dir(tmp_path / "cf" / job, n_a=12, n_b=12, job=job)
     assert set(evaluate(tmp_path / "cf")["target"]) == {"A__B", "A__C"}
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        # AlphaFold3 re-runs land in "<job>_<date>_<time>" instead of overwriting
+        ("af3/P0__P1/P0__P1_20260817_143022/seed-1_sample-0/model.cif", "P0__P1"),
+        ("af3/P0__P1/P0__P1_20260817_143022/P0__P1_model.cif", "P0__P1"),
+        # a first run has no suffix and must be unchanged
+        ("af3/P0__P1/P0__P1/seed-1_sample-0/model.cif", "P0__P1"),
+        # digits that are not a timestamp are part of the name
+        ("af3/P0__P1_2/model.cif", "P0__P1_2"),
+    ],
+)
+def test_rerun_timestamps_do_not_split_a_target(path, expected):
+    assert infer_target(path) == expected

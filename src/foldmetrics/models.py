@@ -23,6 +23,11 @@ _RUN_WORDS = frozenset(
 )
 _TOKEN_RE = re.compile(r"[A-Za-z]+|\d+")
 
+# AlphaFold3 does not overwrite a non-empty output directory: it appends a
+# timestamp (run_alphafold.py, ``<name>_%Y%m%d_%H%M%S``), so re-running a job
+# would otherwise register as a separate target.
+_TIMESTAMP_SUFFIX_RE = re.compile(r"_\d{8}_\d{6}$")
+
 
 def _is_run_component(name: str) -> bool:
     """True when every word in ``name`` is a run descriptor or a number.
@@ -81,7 +86,7 @@ def infer_target(source: str | Path) -> str:
     path = Path(source)
     for part in reversed(path.parent.parts):
         if not _is_run_component(part):
-            return part
+            return _TIMESTAMP_SUFFIX_RE.sub("", part) or part
 
     stem = _strip_run_suffixes(path.stem)
     return stem or path.parent.name or "unknown"
