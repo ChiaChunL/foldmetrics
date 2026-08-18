@@ -17,6 +17,23 @@ from foldmetrics.parsers.structure import autoscale_plddt, tokenize_structure
 
 SCORES_RE = re.compile(r"^(?P<base>.+)_scores_rank_(?P<rank>\d+)_(?P<tag>.+)\.json$")
 
+# ColabFold names every file "{jobname}_{kind}_rank_{NNN}_{model_type}...",
+# so the job is the prefix. colabfold_batch writes a whole panel flat into
+# one output directory, where the directory name says nothing about the
+# job -- the file name is the only reliable source.
+TARGET_SPLIT_RE = re.compile(r"_(?:(?:un)?relaxed|scores)_rank_\d+_")
+
+
+def target_from_filename(filename: str) -> str | None:
+    """Job name from a ColabFold output file name, or None if not one.
+
+    ColabFold passes job names through its ``safe_filename()`` (anything
+    outside ``[A-Za-z0-9_.-]`` becomes ``_``), so names such as ``A__B``
+    survive unchanged.
+    """
+    match = TARGET_SPLIT_RE.search(filename)
+    return filename[: match.start()] or None if match else None
+
 
 @register
 class ColabFoldParser(ToolParser):
@@ -88,6 +105,7 @@ class ColabFoldParser(ToolParser):
             name=unit.name,
             tool=self.tool,
             source=unit.files["structure"],
+            target=target_from_filename(unit.files["structure"].name),
             tokens=tokens,
             pae=pae,
             ptm=ptm,

@@ -121,6 +121,9 @@ class Prediction:
     tool: str
     source: Path
     tokens: list[Token]
+    # set by parsers whose file naming states the job explicitly; takes
+    # precedence over the path heuristic in :func:`infer_target`
+    target: str | None = None
     pae: np.ndarray | None = None
     ptm: float | None = None
     iptm: float | None = None

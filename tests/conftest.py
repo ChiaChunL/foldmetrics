@@ -152,13 +152,16 @@ def finish_structure(st: gemmi.Structure, model: gemmi.Model, path: Path) -> Non
 # ------------------------------------------------------------- tool fixtures
 
 
-def write_colabfold_dir(directory: Path, n_a: int = 30, n_b: int = 30) -> Path:
+def write_colabfold_dir(
+    directory: Path, n_a: int = 30, n_b: int = 30, job: str = "job"
+) -> Path:
+    """Write one ColabFold job; several jobs may share one directory."""
     directory.mkdir(parents=True, exist_ok=True)
     tag = "rank_001_alphafold2_multimer_v3_model_1_seed_000"
     st, model = new_structure()
     add_protein_chain(model, "A", n_a, origin=(0.0, 0.0, 0.0))
     add_protein_chain(model, "B", n_b, origin=(0.0, 5.0, 0.0))
-    finish_structure(st, model, directory / f"job_unrelaxed_{tag}.pdb")
+    finish_structure(st, model, directory / f"{job}_unrelaxed_{tag}.pdb")
 
     n = n_a + n_b
     scores = {
@@ -172,7 +175,7 @@ def write_colabfold_dir(directory: Path, n_a: int = 30, n_b: int = 30) -> Path:
         "pdockq": {"A-B": 0.52},
         "pdockq2": {"A-B": 0.93, "B-A": 0.92},
     }
-    (directory / f"job_scores_{tag}.json").write_text(json.dumps(scores))
+    (directory / f"{job}_scores_{tag}.json").write_text(json.dumps(scores))
     return directory
 
 

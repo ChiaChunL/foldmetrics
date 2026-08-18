@@ -87,3 +87,50 @@ def test_normal_layout_is_unaffected_by_the_fallback():
         infer_target("out/P53__MDM2/seed_1/predictions/P53__MDM2_sample_0.cif")
         == "P53__MDM2"
     )
+
+
+# --------------------------------------------------------------- ColabFold
+# colabfold_batch writes an entire panel flat into one output directory, so
+# no directory can carry the job name; the file name is authoritative.
+COLABFOLD_NAMES = [
+    ("A__B_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000.pdb", "A__B"),
+    ("A__B_relaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000.pdb", "A__B"),
+    (
+        "P53__MDM2_scores_rank_001_alphafold2_multimer_v3_model_1_seed_000.json",
+        "P53__MDM2",
+    ),
+    ("A__B_unrelaxed_rank_001_alphafold2_ptm_model_3_seed_000.cif", "A__B"),
+    ("not_a_colabfold_file.pdb", None),
+]
+
+
+@pytest.mark.parametrize(("filename", "expected"), COLABFOLD_NAMES)
+def test_colabfold_target_from_filename(filename, expected):
+    from foldmetrics.parsers.colabfold import target_from_filename
+
+    assert target_from_filename(filename) == expected
+
+
+def test_colabfold_flat_panel_keeps_targets_apart(tmp_path):
+    """A flat panel must not collapse onto the output directory name."""
+    from conftest import write_colabfold_dir
+
+    from foldmetrics.api import aggregate_by_target, evaluate
+
+    panel = tmp_path / "results" / "colabfold" / "panel"
+    for job in ("A__B", "A__C", "P53__MDM2"):
+        write_colabfold_dir(panel, n_a=12, n_b=12, job=job)
+
+    df = evaluate(panel)
+    assert set(df["target"]) == {"A__B", "A__C", "P53__MDM2"}
+    assert len(aggregate_by_target(df)) == 3
+
+
+def test_colabfold_per_job_directories_still_work(tmp_path):
+    from conftest import write_colabfold_dir
+
+    from foldmetrics.api import evaluate
+
+    for job in ("A__B", "A__C"):
+        write_colabfold_dir(tmp_path / "cf" / job, n_a=12, n_b=12, job=job)
+    assert set(evaluate(tmp_path / "cf")["target"]) == {"A__B", "A__C"}

@@ -334,7 +334,7 @@ def compute_summary(
     summary: dict[str, Any] = {
         "model": pred.name,
         "tool": pred.tool,
-        "target": infer_target(pred.source),
+        "target": pred.target or infer_target(pred.source),
         "chains": ",".join(pred.chains),
         "n_chains": len(pred.chains),
         "n_tokens": pred.n_tokens,
