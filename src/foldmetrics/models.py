@@ -46,12 +46,19 @@ def _is_run_component(name: str) -> bool:
 
 
 def _strip_run_suffixes(stem: str) -> str:
-    """Drop trailing run descriptors from a file stem: ``job_sample_0`` -> ``job``."""
+    """Drop trailing run descriptors from a file stem: ``job_sample_0`` -> ``job``.
+
+    A doubled separator marks a field boundary inside job names
+    (``P53__MDM2``), so stripping never crosses one: ``model__sample_0``
+    keeps both halves even though each is spelled like a run word.
+    """
     while True:
-        match = re.search(r"[._-]+([A-Za-z]*)(\d*)$", stem)
+        match = re.search(r"([._-]+)([A-Za-z]*)(\d*)$", stem)
         if match is None:
             return stem
-        word, number = match.group(1), match.group(2)
+        separator, word, number = match.groups()
+        if len(separator) > 1:
+            return stem
         if not word and not number:
             return stem
         if word and word.lower() not in _RUN_WORDS:

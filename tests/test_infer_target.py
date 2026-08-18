@@ -63,3 +63,27 @@ def test_job_names_containing_run_words_are_kept():
     # a real job directory is kept even when a run word appears inside it
     assert infer_target("x/boltz_results_boltz2/model_0.cif") == "boltz_results_boltz2"
     assert infer_target("x/sample_prep_A/seed1/m.cif") == "sample_prep_A"
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        # `__` separates the two halves of a job name; a half that happens to
+        # be spelled like a run word must survive the file-name fallback
+        ("predictions/model__sample_0.cif", "model__sample"),
+        ("predictions/fold__run_model_0.cif", "fold__run"),
+        ("predictions/RANK1__MODEL2_sample_0.cif", "RANK1__MODEL2"),
+        # single separators are still stripped
+        ("predictions/P53__MDM2_sample_0.cif", "P53__MDM2"),
+        ("predictions/job7_model_3.cif", "job7"),
+    ],
+)
+def test_file_name_fallback_does_not_cross_field_boundaries(path, expected):
+    assert infer_target(path) == expected
+
+
+def test_normal_layout_is_unaffected_by_the_fallback():
+    assert (
+        infer_target("out/P53__MDM2/seed_1/predictions/P53__MDM2_sample_0.cif")
+        == "P53__MDM2"
+    )
