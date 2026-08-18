@@ -4,7 +4,7 @@
 
 | Testing | [![CI](https://github.com/ChiaChunL/foldmetrics/actions/workflows/ci.yml/badge.svg)](https://github.com/ChiaChunL/foldmetrics/actions/workflows/ci.yml) |
 |---|---|
-| Package | [![PyPI Latest Release](https://img.shields.io/pypi/v/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) [![Python versions](https://img.shields.io/pypi/pyversions/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) [![PyPI Downloads](https://img.shields.io/pypi/dm/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) |
+| Package | [![PyPI Latest Release](https://img.shields.io/pypi/v/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) [![Python versions](https://img.shields.io/pypi/pyversions/foldmetrics.svg)](https://pypi.org/project/foldmetrics/) [![PyPI Downloads](https://img.shields.io/pypi/dm/foldmetrics.svg?cacheSeconds=86400)](https://pypistats.org/packages/foldmetrics) |
 | Meta | [![License - BSD 3-Clause](https://img.shields.io/badge/license-BSD%203--Clause-blue.svg)](LICENSE) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) |
 
 ## 🧬 What is it?
