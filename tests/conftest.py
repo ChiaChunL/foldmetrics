@@ -300,3 +300,49 @@ def write_boltz_dir(
             )
         )
     return directory
+
+
+def write_af2_native_dir(directory: Path, n_a: int = 15, n_b: int = 15) -> Path:
+    """AlphaFold2-Multimer's real output directory.
+
+    Five network weights (``model_1..5``) times the sampling index
+    (``pred_N``) -- there is no seed dimension. Every model is written four
+    times: ``unrelaxed_<tag>`` and the ranked copy ``ranked_<i>``, each as
+    both ``.cif`` and ``.pdb``, so a naive scan counts four times too many.
+    """
+    import pickle
+
+    directory.mkdir(parents=True, exist_ok=True)
+    tags = [f"model_{i}_multimer_v3_pred_0" for i in range(1, 6)]
+    n = n_a + n_b
+    for rank, tag in enumerate(tags):
+        st, model = new_structure()
+        add_protein_chain(model, "A", n_a, origin=(0.0, 0.0, 0.0))
+        add_protein_chain(model, "B", n_b, origin=(0.0, 5.0, 0.0))
+        for stem in (f"unrelaxed_{tag}", f"ranked_{rank}"):
+            for suffix in (".pdb", ".cif"):
+                st2, model2 = new_structure()
+                add_protein_chain(model2, "A", n_a, origin=(0.0, 0.0, 0.0))
+                add_protein_chain(model2, "B", n_b, origin=(0.0, 5.0, 0.0))
+                finish_structure(st2, model2, directory / f"{stem}{suffix}")
+        with (directory / f"result_{tag}.pkl").open("wb") as fh:
+            pickle.dump(
+                {
+                    "plddt": np.full(n, 82.0),
+                    "predicted_aligned_error": np.full((n, n), 4.0),
+                    "ptm": 0.71,
+                    "iptm": 0.63,
+                    "ranking_confidence": 0.646,
+                },
+                fh,
+            )
+        (directory / f"confidence_{tag}.json").write_text(
+            json.dumps({"confidenceScore": [82.0] * n})
+        )
+        (directory / f"pae_{tag}.json").write_text(
+            json.dumps([{"predicted_aligned_error": np.full((n, n), 4.0).tolist()}])
+        )
+    (directory / "ranking_debug.json").write_text(
+        json.dumps({"iptm+ptm": {tag: 0.65 for tag in tags}, "order": tags})
+    )
+    return directory

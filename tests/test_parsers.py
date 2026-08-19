@@ -202,3 +202,26 @@ def test_chai_stacked_pae_npz_is_indexed_per_model(tmp_path):
         assert pred.has_pae, unit.name
         assert not pred.warnings
         assert math.isclose(float(pred.pae[0, 0]), 2.0 + idx)
+
+
+def test_af2_native_layout_counts_each_model_once(tmp_path):
+    """AlphaFold2 writes every model four times; only one may be scored."""
+    from conftest import write_af2_native_dir
+
+    directory = write_af2_native_dir(tmp_path / "af2_multimer" / "P0__P1")
+    structures = list(directory.glob("*.pdb")) + list(directory.glob("*.cif"))
+    assert len(structures) == 20  # 5 models x (unrelaxed, ranked) x (pdb, cif)
+
+    units = discover(tmp_path)
+    assert len(units) == 5
+    assert {u.name for u in units} == {
+        f"model_{i}_multimer_v3_pred_0" for i in range(1, 6)
+    }
+    # the ranked copies must never be the scored structure
+    assert not any("ranked_" in u.files["structure"].name for u in units)
+
+    df = evaluate(tmp_path)
+    assert len(df) == 5
+    assert set(df["target"]) == {"P0__P1"}  # weights and samples are one target
+    assert df["has_pae"].all()
+    assert df["warnings"].fillna("").eq("").all()
