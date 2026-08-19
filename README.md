@@ -32,6 +32,12 @@ Beyond scores it extracts **confident interface contacts** (with
 ready-to-open PyMOL/ChimeraX sessions) and renders **publication-oriented
 figures**.
 
+Point it at whatever the engine wrote — its own output tree, untouched.
+To *produce* those predictions in the first place,
+[foldrunner](https://github.com/ChiaChunL/foldrunner) enumerates the pairs,
+computes each MSA once and drives all of these engines from one panel; its
+output is what foldmetrics reads here.
+
 ## 📦 Installation
 
 ```bash
